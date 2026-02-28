@@ -128,15 +128,15 @@ parse_sx130x() {
 	local section="$1"
 	local comif
 	local devpath
-	local region
+	local device
 	local buffer
 
 	config_get comif "$section" comif "$DEFAULT_COMIF"
 	config_get devpath "$section" devpath "$DEFAULT_DEVPATH"
-	config_get region "$section" region
+	config_get device "$section" device
 
-	if [ -n "$region" ] && [ -f "/etc/basicstation/$region.json" ]; then
-		json_load_file "/etc/basicstation/${region}.json"
+	if [ -n "$device" ] && [ -f "/etc/basicstation/$device.json" ]; then
+		json_load_file "/etc/basicstation/${device}.json"
 		json_select radio_conf
 		json_add_string device "${comif}:${devpath}"
 		json_select ..
