@@ -184,6 +184,7 @@ parse_station() {
 	json_add_int 'log_size' $(( 1000000*buffer ))
 	config_get buffer "$section" logRotate "$DEFAULT_LOG_ROTATE"
 	json_add_int 'log_rotate' "$buffer"
+	json_add_string "RADIO_INIT_WAIT" "5s"
 	# station_conf object will be supplemented and closed by parse_auth
 }
 

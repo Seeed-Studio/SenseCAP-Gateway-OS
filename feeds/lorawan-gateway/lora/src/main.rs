@@ -84,7 +84,7 @@ fn load_gpio_config() -> GpioConfig {
 }
 
 fn wait_gpio() {
-    thread::sleep(Duration::from_millis(100));
+    thread::sleep(Duration::from_millis(20));
 }
 
 fn start(config: &GpioConfig) -> anyhow::Result<()> {
@@ -167,7 +167,6 @@ fn main() -> anyhow::Result<()> {
     } else if args.len() == 2 && args[1] == "stop" {
         stop(&config)
     } else {
-        eprintln!("Usage: {} [start|stop]", args[0]);
-        std::process::exit(1);
+        start(&config)
     }
 }
