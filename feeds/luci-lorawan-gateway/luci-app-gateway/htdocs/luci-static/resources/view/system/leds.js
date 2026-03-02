@@ -84,6 +84,30 @@ return view.extend({
             return value;
         };
 
+        // Validate that the same LED is not configured multiple times
+        o.validate = function (section_id, value) {
+            // Get all LED sections
+            var sections = uci.sections('system', 'led');
+
+            // Check if any other section uses the same sysfs
+            for (var i = 0; i < sections.length; i++) {
+                var other_section = sections[i];
+
+                // Skip self and sections without sysfs
+                if (other_section['.name'] === section_id || !other_section.sysfs) {
+                    continue;
+                }
+
+                // Check if the sysfs value matches
+                if (other_section.sysfs === value) {
+                    var other_name = other_section.name || other_section['.name'];
+                    return _('This LED is already configured in "%s". Each LED can only be configured once.').format(other_name);
+                }
+            }
+
+            return true;
+        };
+
         o = s.option(form.ListValue, 'trigger', _('Trigger'));
         for (var i = 0; i < plugins.length; i++) {
             var plugin = plugins[i];
