@@ -105,6 +105,9 @@ uci -q delete mwan3.wanb_only
 uci -q delete mwan3.balanced
 uci -q delete mwan3.wan_wanb
 uci -q delete mwan3.wanb_wan
+# Delete default rules that may use sticky (not supported in LXC)
+uci -q delete mwan3.https
+uci -q delete mwan3.default_rule_v6
 # wan interface
 uci set mwan3.wan=interface
 uci set mwan3.wan.enabled='1'
