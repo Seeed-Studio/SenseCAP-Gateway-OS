@@ -24,6 +24,9 @@
                 "/version.txt": [
                     "read"
                 ],
+                "/var/run/lte-info.json": [
+                    "read"
+                ],
                 "/bin/cat /etc/deviceinfo/sn": [
                     "exec"
                 ],
