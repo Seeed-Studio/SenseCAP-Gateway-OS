@@ -11,6 +11,10 @@ LTE_INFO_UPDATE_INTERVAL=10
 # Load JSON library
 . /usr/share/libubox/jshn.sh
 
+# Caches for static info to prevent QMI port locking
+CACHED_IMEI=""
+CACHED_ICCID=""
+
 log() {
     logger -t "$LOG_TAG" "$1"
 }
@@ -72,20 +76,24 @@ update_lte_info_cache() {
     # Add connected status
     json_add_string connected "$is_connected"
 
-    # Get IMEI
-    imei=$(uqmi -s -d "$lte_device" --get-imei 2>/dev/null | tr -d '"\n')
-    if [ -n "$imei" ] && [ "$imei" != "Not supported" ] && [ "$imei" != "not supported" ]; then
-        json_add_string imei "$imei"
+    # Get IMEI (Only query if not cached, with timeout to prevent hang)
+    if [ -z "$CACHED_IMEI" ] || [ "$CACHED_IMEI" = "Not supported" ] || [ "$CACHED_IMEI" = "not supported" ]; then
+        CACHED_IMEI=$(uqmi -s -t 500 -d "$lte_device" --get-imei 2>/dev/null | tr -d '"\n')
+    fi
+    if [ -n "$CACHED_IMEI" ] && [ "$CACHED_IMEI" != "Not supported" ] && [ "$CACHED_IMEI" != "not supported" ]; then
+        json_add_string imei "$CACHED_IMEI"
     fi
 
-    # Get ICCID
-    iccid=$(uqmi -s -d "$lte_device" --get-iccid 2>/dev/null | tr -d '"\n')
-    if [ -n "$iccid" ] && [ "$iccid" != "Not supported" ] && [ "$iccid" != "not supported" ]; then
-        json_add_string iccid "$iccid"
+    # Get ICCID (Only query if not cached, with timeout to prevent hang)
+    if [ -z "$CACHED_ICCID" ] || [ "$CACHED_ICCID" = "Not supported" ] || [ "$CACHED_ICCID" = "not supported" ]; then
+        CACHED_ICCID=$(uqmi -s -t 500 -d "$lte_device" --get-iccid 2>/dev/null | tr -d '"\n')
+    fi
+    if [ -n "$CACHED_ICCID" ] && [ "$CACHED_ICCID" != "Not supported" ] && [ "$CACHED_ICCID" != "not supported" ]; then
+        json_add_string iccid "$CACHED_ICCID"
     fi
 
-    # Get RSSI
-    rssi=$(uqmi -s -d "$lte_device" --get-signal-info 2>/dev/null | jsonfilter -e '@.rssi' 2>/dev/null)
+    # Get RSSI (With timeout, may fail if QMI channel is busy)
+    rssi=$(uqmi -s -t 500 -d "$lte_device" --get-signal-info 2>/dev/null | jsonfilter -e '@.rssi' 2>/dev/null)
     if [ -n "$rssi" ]; then
         json_add_string rssi "$rssi"
     fi
@@ -114,7 +122,7 @@ main() {
     fi
 
     local last_at_time=0
-    local last_lte_info_update=0
+    local last_lte_info_update=$(($(date +%s) + 20)) # Delay first info update by 20s to allow netifd to initialize QMI
 
     # Main initialization loop
     while true; do
