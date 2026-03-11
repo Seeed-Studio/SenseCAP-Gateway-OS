@@ -117,7 +117,7 @@ return view.extend({
         o.default = '40001';
         o.rmempty = false;
 
-        o = s.option(form.Value, 'data_length', _('Data Length (Words/Bits)'));
+        o = s.option(form.Value, 'data_length', _('Register Count'), _('Number of registers to read/write. 1 register = 16 bits.'));
         o.depends('type', 'modbus-rtu');
         o.datatype = 'range(1,125)';
         o.placeholder = '10';
