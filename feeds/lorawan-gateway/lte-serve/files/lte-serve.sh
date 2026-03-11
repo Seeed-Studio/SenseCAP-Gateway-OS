@@ -82,7 +82,7 @@ update_lte_info_cache() {
 
     # Get IMEI (Only query if not cached, with timeout to prevent hang)
     if [ -z "$CACHED_IMEI" ] || [ "$CACHED_IMEI" = "Not supported" ] || [ "$CACHED_IMEI" = "not supported" ]; then
-        CACHED_IMEI=$(uqmi -s -t 500 -d "$lte_device" --get-imei 2>/dev/null | tr -d '"\n')
+        CACHED_IMEI=$(uqmi -s -t 100 -d "$lte_device" --get-imei 2>/dev/null | tr -d '"\n')
     fi
     if [ -n "$CACHED_IMEI" ] && [ "$CACHED_IMEI" != "Not supported" ] && [ "$CACHED_IMEI" != "not supported" ]; then
         json_add_string imei "$CACHED_IMEI"
@@ -90,7 +90,7 @@ update_lte_info_cache() {
 
     # Get ICCID (Only query if not cached, with timeout to prevent hang)
     if [ -z "$CACHED_ICCID" ] || [ "$CACHED_ICCID" = "Not supported" ] || [ "$CACHED_ICCID" = "not supported" ]; then
-        CACHED_ICCID=$(uqmi -s -t 500 -d "$lte_device" --get-iccid 2>/dev/null | tr -d '"\n')
+        CACHED_ICCID=$(uqmi -s -t 100 -d "$lte_device" --get-iccid 2>/dev/null | tr -d '"\n')
         # Fallback to AT command if uqmi fails
         if [ -z "$CACHED_ICCID" ] || [ "$CACHED_ICCID" = "Not supported" ] || [ "$CACHED_ICCID" = "not supported" ]; then
             local at_port=$(uci -q get hardware.hardware.lte_usb_port)
@@ -106,7 +106,7 @@ update_lte_info_cache() {
     fi
 
     # Get RSSI (With timeout, may fail if QMI channel is busy)
-    rssi=$(uqmi -s -t 500 -d "$lte_device" --get-signal-info 2>/dev/null | jsonfilter -e '@.rssi' 2>/dev/null)
+    rssi=$(uqmi -s -t 100 -d "$lte_device" --get-signal-info 2>/dev/null | jsonfilter -e '@.rssi' 2>/dev/null)
     if [ -n "$rssi" ]; then
         json_add_string rssi "$rssi"
     fi
