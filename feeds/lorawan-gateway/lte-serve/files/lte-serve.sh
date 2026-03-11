@@ -6,7 +6,7 @@
 LOG_TAG="[LTE-Serve]"
 AT_RETRY_INTERVAL=180
 LTE_INFO_CACHE="/var/run/lte-info.json"
-LTE_INFO_UPDATE_INTERVAL=10
+LTE_INFO_UPDATE_INTERVAL=60
 
 # if $1 is not empty, set LTE_INFO_CACHE to $1
 if [ -n "$1" ]; then
@@ -91,6 +91,15 @@ update_lte_info_cache() {
     # Get ICCID (Only query if not cached, with timeout to prevent hang)
     if [ -z "$CACHED_ICCID" ] || [ "$CACHED_ICCID" = "Not supported" ] || [ "$CACHED_ICCID" = "not supported" ]; then
         CACHED_ICCID=$(uqmi -s -t 500 -d "$lte_device" --get-iccid 2>/dev/null | tr -d '"\n')
+        # Fallback to AT command if uqmi fails
+        if [ -z "$CACHED_ICCID" ] || [ "$CACHED_ICCID" = "Not supported" ] || [ "$CACHED_ICCID" = "not supported" ]; then
+            local at_port=$(uci -q get hardware.hardware.lte_usb_port)
+            if [ -n "$at_port" ] && [ -e "$at_port" ]; then
+                echo -e "AT+QCCID\r" > "$at_port" 2>/dev/null
+                sleep 1
+                CACHED_ICCID=$(timeout 1 cat "$at_port" 2>/dev/null | grep -oE '[0-9]{19,20}' | head -1)
+            fi
+        fi
     fi
     if [ -n "$CACHED_ICCID" ] && [ "$CACHED_ICCID" != "Not supported" ] && [ "$CACHED_ICCID" != "not supported" ]; then
         json_add_string iccid "$CACHED_ICCID"
