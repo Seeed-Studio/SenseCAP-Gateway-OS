@@ -2,17 +2,16 @@
     "luci-app-lte": {
         "description": "Grant access to LTE configuration",
         "read": {
-            "uci": [ "network" ],
-            "ubus": {
-                "file": [ "read", "write", "stat", "exec" ],
-                "uci": [ "get", "set", "commit" ]
+            "uci": [ "network", "hardware" ],
+            "file": {
+                "/etc/init.d/lte-serve": [ "exec" ],
+                "/var/run/lte-info.json": [ "read" ]
             }
         },
         "write": {
-            "uci": [ "network" ],
-            "ubus": {
-                "file": [ "read", "write", "stat", "exec" ],
-                "uci": [ "get", "set", "commit" ]
+            "uci": [ "network", "hardware" ],
+            "file": {
+                "/etc/init.d/lte-serve": [ "exec" ]
             }
         }
     }

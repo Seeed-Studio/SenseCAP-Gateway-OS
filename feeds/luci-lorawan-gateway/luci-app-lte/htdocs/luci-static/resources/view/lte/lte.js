@@ -25,7 +25,7 @@ return view.extend({
         s.addremove = false;
 
         // Enable 4G/LTE
-        o = s.option(form.Flag, 'auto', _('Enable 4G/LTE'),
+        o = s.option(form.Flag, 'enable', _('Enable 4G/LTE'),
             _('Enable or disable 4G/LTE connection'));
         o.default = '1';
         o.rmempty = false;
@@ -34,7 +34,7 @@ return view.extend({
         o = s.option(form.Button, '_restart_network', _('Restart'));
         o.inputtitle = _('Restart Connection');
         o.inputstyle = 'action';
-        o.depends('auto', '1');
+        o.depends('enable', '1');
         o.onclick = L.bind(function(ev) {
             var btn = ev.target;
             btn.disabled = true;
@@ -180,14 +180,17 @@ return view.extend({
         return m.render();
     },
 
-    // Override handleSaveApply to restart lte-serve after saving
+    // Override handleSaveApply to set disabled=1 when config changes
     handleSaveApply: function(ev, mode) {
         var self = this;
 
-        // Call parent's handleSaveApply first
+        // Set disabled=1 before saving (will be set to 0 by lte-serve after initialization)
+        uci.set('network', 'LTE', 'disabled', '1');
+
+        // Call parent's handleSaveApply
         return this.super('handleSaveApply', [ev, mode])
             .then(function() {
-                // Restart lte-serve service to reload cached info
+                // Restart lte-serve service
                 return fs.exec('/etc/init.d/lte-serve', ['restart']);
             })
             .then(function() {
