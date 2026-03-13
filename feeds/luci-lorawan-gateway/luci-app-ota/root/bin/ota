@@ -178,18 +178,48 @@ do_upgrade() {
         echo "No firmware file found!" >&2
         return 1
     fi
-    
+
+    # Backup config before upgrade
+    echo "Backing up configuration..."
+    BACKUP_DIR="/tmp/config-backup"
+    mkdir -p "$BACKUP_DIR"
+
+    # Backup /etc/config
+    if [ -d "/etc/config" ]; then
+        cp -a /etc/config "$BACKUP_DIR/"
+    fi
+
+    # Backup marker files
+    for marker in /etc/.gateway_configured /etc/.lora_configured /etc/.wifi_configured; do
+        if [ -f "$marker" ]; then
+            cp "$marker" "$BACKUP_DIR/"
+        fi
+    done
+
     echo "Extracting firmware..."
     tar -xzf /tmp/firmware.img.tar.gz -C /
-    
+
     if [ $? -eq 0 ]; then
-        echo "Firmware extracted successfully. Rebooting..."
+        # Restore config after upgrade
+        echo "Restoring configuration..."
+        if [ -d "$BACKUP_DIR/config" ]; then
+            cp -a "$BACKUP_DIR/config/"* /etc/config/ 2>/dev/null
+        fi
+        for marker in "$BACKUP_DIR"/.*_configured; do
+            if [ -f "$marker" ]; then
+                cp "$marker" /etc/
+            fi
+        done
+
+        echo "Firmware upgraded successfully. Rebooting..."
         rm -f /tmp/firmware.img.tar.gz
+        rm -rf "$BACKUP_DIR"
         sync
         reboot
         return 0
     else
         echo "Failed to extract firmware!" >&2
+        rm -rf "$BACKUP_DIR"
         return 1
     fi
 }
