@@ -1,0 +1,86 @@
+#!/bin/sh
+
+# Check if already configured (has EUI)
+eui=$(uci -q get lora.radio.eui)
+if [ -n "$eui" ]; then
+	# Already configured, skip
+	exit 0
+fi
+
+# Create config file if not exists
+if [ ! -e "/etc/config/lora" ]; then
+	touch /etc/config/lora
+	uci set lora.radio=radio
+	uci set lora.radio.eui=''
+	uci set lora.radio.device=''
+	uci set lora.radio.region=''
+	uci set lora.radio.freq_plan=''
+	uci set lora.radio.channel_plan=''
+	uci set lora.radio.enabled='0'
+	uci set lora.radio.platform='chirpstack'
+	uci set lora.ui=log
+	uci set lora.ui.auto_refresh='1'
+	uci set lora.ui.buffer_limit='2000'
+	uci add_list lora.ui.watch_keywords='error'
+	uci commit lora
+fi
+
+# Set EUI from MAC address
+MAC_STR=$(cat /sys/class/net/eth0/address 2>/dev/null)
+MAC_FORMATTED=$(echo "$MAC_STR" | sed 's/://g' | tr 'a-f' 'A-F')
+DEFAULT_EUI="${MAC_FORMATTED}0000"
+
+if [ -e "/etc/deviceinfo/eui" ]; then
+	DEFAULT_EUI=$(cat /etc/deviceinfo/eui)
+fi
+
+uci set lora.radio.platform="chirpstack"
+uci set lora.radio.eui="$DEFAULT_EUI"
+
+# Set region/freq from deviceinfo
+if [ -e "/etc/deviceinfo/freq_plan" ]; then
+	region=$(cat /etc/deviceinfo/freq_plan)
+	case "$region" in
+		"915" | "US915")
+			REGION_MODEM="US915"
+			FREQ_PLAN="US_902_928_FSB_1"
+			DEVICE="US915"
+			FREQ="us915_1"
+			;;
+		"868" | "EU868")
+			REGION_MODEM="EU868"
+			FREQ_PLAN="EU_863_870_TTN"
+			DEVICE="EU868"
+			FREQ="eu868"
+			;;
+		*)
+			REGION_MODEM="US915"
+			FREQ_PLAN="US_902_928_FSB_1"
+			DEVICE="US915"
+			FREQ="us915_1"
+			;;
+	esac
+else
+	REGION_MODEM="US915"
+	FREQ_PLAN="US_902_928_FSB_1"
+	DEVICE="US915"
+	FREQ="us915_1"
+fi
+
+uci set lora.radio.region="$REGION_MODEM"
+uci set lora.radio.channel_plan="$FREQ_PLAN"
+uci set lora.radio.device="$DEVICE"
+uci set lora.radio.freq_plan="$FREQ"
+uci commit lora
+
+# Also update packetforwarder and basicstation
+uci set packetforwarder.sx130x.region="$REGION_MODEM"
+uci set packetforwarder.sx130x.channel_plan="$FREQ_PLAN"
+uci set packetforwarder.gateway.gateway_ID="$DEFAULT_EUI"
+uci commit packetforwarder
+
+uci set basicstation.sx130x.region="$REGION_MODEM"
+uci set basicstation.station.routerid="$DEFAULT_EUI"
+uci commit basicstation
+
+exit 0

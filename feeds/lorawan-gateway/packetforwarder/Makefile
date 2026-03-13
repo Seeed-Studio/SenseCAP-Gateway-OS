@@ -65,8 +65,8 @@ define Package/packetforwarder/install
 	$(INSTALL_DIR) $(1)/usr/bin/packetforwarder
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/packet_forwarder/lora_pkt_fwd $(1)/usr/bin/packetforwarder/
 
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/etc/config/packetforwarder $(1)/etc/config/packetforwarder
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/etc/uci-defaults/70_packetforwarder $(1)/etc/uci-defaults/70_packetforwarder
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/lora_pkt_fwd.init $(1)/etc/init.d/lora_pkt_fwd

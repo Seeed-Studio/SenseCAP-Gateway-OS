@@ -1,15 +1,23 @@
 #!/bin/sh
-# Delete existing bridge and LAN configuration
-uci delete network.lan
-uci delete network.@device[0]
-uci commit network
+
+# Use a marker file to distinguish:
+# - First boot: marker not exists → apply our config
+# - OTA upgrade: marker exists → skip, keep user config
+
+MARKER="/etc/.gateway_configured"
+
+if [ -f "$MARKER" ]; then
+	# Already configured (OTA upgrade), skip
+	exit 0
+fi
+
+# First boot: apply our configuration
+
+# Delete existing bridge and LAN configuration if exists
+uci -q delete network.lan
+uci -q delete network.@device[0]
 
 # Set network configuration
-uci set network.loopback=interface
-uci set network.loopback.device='lo'
-uci set network.loopback.proto='static'
-uci set network.loopback.ipaddr='127.0.0.1'
-uci set network.loopback.netmask='255.0.0.0'
 uci set network.globals=globals
 uci set network.globals.ula_prefix='fdf4:628a:1dc9::/48'
 uci set network.wan=interface
@@ -23,7 +31,7 @@ uci set network.LTE.auth='none'
 uci set network.LTE.pdptype='ipv4'
 uci set network.LTE.enable='1'
 uci set network.LTE.disabled='1'
-uci set network.LTE.metric='20' 
+uci set network.LTE.metric='20'
 uci set network.wlan=interface
 uci set network.wlan.proto='static'
 uci set network.wlan.type='bridge'
@@ -33,7 +41,7 @@ uci set network.wlan.device='wlan0'
 uci set network.wwan=interface
 uci set network.wwan.proto='dhcp'
 uci set network.wwan.device='wlan0'
-uci set network.wwan.metric='30' 
+uci set network.wwan.metric='30'
 uci commit network
 
 # Set firewall rules
@@ -69,7 +77,7 @@ uci add firewall rule
 uci set firewall.@rule[-1].name='Allow-lora'
 uci set firewall.@rule[-1].src='wan'
 uci set firewall.@rule[-1].proto='tcp udp'
-uci set firewall.@rule[-1].dest_port='443 1700 8887' 
+uci set firewall.@rule[-1].dest_port='443 1700 8887'
 uci set firewall.@rule[-1].target='ACCEPT'
 uci set firewall.@rule[-1].family='ipv4'
 uci add_list firewall.@zone[0].network='wlan'
@@ -106,7 +114,6 @@ uci -q delete mwan3.wanb_only
 uci -q delete mwan3.balanced
 uci -q delete mwan3.wan_wanb
 uci -q delete mwan3.wanb_wan
-# Delete default rules that may use sticky (not supported in LXC)
 uci -q delete mwan3.https
 uci -q delete mwan3.default_rule_v6
 # wan interface
@@ -126,6 +133,7 @@ uci set mwan3.wan.failure_interval='5'
 uci set mwan3.wan.recovery_interval='5'
 uci set mwan3.wan.down='3'
 uci set mwan3.wan.up='3'
+uci -q delete mwan3.wan.track_ip
 uci add_list mwan3.wan.track_ip='8.8.8.8'
 uci add_list mwan3.wan.track_ip='1.1.1.1'
 # LTE interface
@@ -145,6 +153,7 @@ uci set mwan3.LTE.failure_interval='5'
 uci set mwan3.LTE.recovery_interval='5'
 uci set mwan3.LTE.down='3'
 uci set mwan3.LTE.up='3'
+uci -q delete mwan3.LTE.track_ip
 uci add_list mwan3.LTE.track_ip='8.8.8.8'
 uci add_list mwan3.LTE.track_ip='1.1.1.1'
 # wwan interface (lowest priority)
@@ -164,6 +173,7 @@ uci set mwan3.wwan.failure_interval='5'
 uci set mwan3.wwan.recovery_interval='5'
 uci set mwan3.wwan.down='3'
 uci set mwan3.wwan.up='3'
+uci -q delete mwan3.wwan.track_ip
 uci add_list mwan3.wwan.track_ip='8.8.8.8'
 uci add_list mwan3.wwan.track_ip='1.1.1.1'
 # members with metric (metric determines priority)
@@ -179,19 +189,20 @@ uci set mwan3.wwan_m3_w3=member
 uci set mwan3.wwan_m3_w3.interface='wwan'
 uci set mwan3.wwan_m3_w3.metric='3'
 uci set mwan3.wwan_m3_w3.weight='3'
-# Cfailover policy
+# failover policy
 uci set mwan3.failover_policy=policy
+uci -q delete mwan3.failover_policy.use_member
 uci add_list mwan3.failover_policy.use_member='wan_m1_w3'
 uci add_list mwan3.failover_policy.use_member='LTE_m2_w3'
 uci add_list mwan3.failover_policy.use_member='wwan_m3_w3'
-#default rule
+# default rule
 uci set mwan3.default_rule_v4=rule
 uci set mwan3.default_rule_v4.dest_ip='0.0.0.0/0'
 uci set mwan3.default_rule_v4.use_policy='failover_policy'
 uci set mwan3.default_rule_v4.family='ipv4'
 uci commit mwan3
 
-# Set rpcd login 
+# Set rpcd login
 uci set rpcd.@login[0].username='admin'
 uci commit rpcd
 
@@ -199,9 +210,14 @@ uci commit rpcd
 uci set system.@system[0].hostname='SenseCAP'
 uci commit system
 
+# Create marker file to indicate configuration is done
+touch "$MARKER"
+
 # Restart services
 /etc/init.d/network restart
 /etc/init.d/firewall restart
 /etc/init.d/rpcd restart
 /etc/init.d/mwan3 restart
 /etc/init.d/dnsmasq restart
+
+exit 0

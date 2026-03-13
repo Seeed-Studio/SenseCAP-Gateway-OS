@@ -43,8 +43,8 @@ define Package/rs485-module/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/rs485-module.init $(1)/etc/init.d/rs485-module
 
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/etc/config/rs485-module $(1)/etc/config/rs485-module
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/etc/uci-defaults/73_rs485-module $(1)/etc/uci-defaults/73_rs485-module
 endef
 
 define Package/rs485-module/postinst

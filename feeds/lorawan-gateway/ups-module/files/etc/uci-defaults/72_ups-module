@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Create ups-module config if not exists
+if [ ! -e "/etc/config/ups-module" ]; then
+	touch /etc/config/ups-module
+
+	# cmd section
+	uci set ups-module.cmd=ups
+	uci add_list ups-module.cmd.commands='echo "Power Outage"'
+
+	# log section
+	uci set ups-module.ui=log
+	uci set ups-module.ui.auto_refresh='1'
+	uci set ups-module.ui.buffer_limit='2000'
+	uci add_list ups-module.ui.watch_keywords='join'
+	uci add_list ups-module.ui.watch_keywords='error'
+
+	uci commit ups-module
+fi
+
+exit 0

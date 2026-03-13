@@ -1,0 +1,61 @@
+#!/bin/sh
+
+# Create rs485-module config if not exists
+if [ ! -e "/etc/config/rs485-module" ]; then
+	touch /etc/config/rs485-module
+
+	# mqtt section
+	uci set rs485-module.mqtt=mqtt
+	uci set rs485-module.mqtt.enabled='0'
+	uci set rs485-module.mqtt.transport='tcp'
+	uci set rs485-module.mqtt.host=''
+	uci set rs485-module.mqtt.port='1883'
+	uci set rs485-module.mqtt.client_id=''
+	uci set rs485-module.mqtt.keepalive='30'
+	uci set rs485-module.mqtt.username=''
+	uci set rs485-module.mqtt.password=''
+	uci set rs485-module.mqtt.auth_mode='none'
+	uci set rs485-module.mqtt.uplink_topic='rs485/uplink'
+	uci set rs485-module.mqtt.downlink_topic='rs485/downlink'
+	uci set rs485-module.mqtt.clean_session='1'
+	uci set rs485-module.mqtt.qos='0'
+	uci set rs485-module.mqtt.reconnect_delay='30'
+	uci set rs485-module.mqtt.retain_status='0'
+
+	# serial section
+	uci set rs485-module.serial=serial
+	uci set rs485-module.serial.enabled='1'
+	uci set rs485-module.serial.device='RS485-1'
+	uci set rs485-module.serial.baudrate='9600'
+	uci set rs485-module.serial.databit='8'
+	uci set rs485-module.serial.stopbit='1'
+	uci set rs485-module.serial.checkbit='none'
+	uci set rs485-module.serial.flowcontrol='none'
+	uci set rs485-module.serial.timeout='1000'
+
+	# log section
+	uci set rs485-module.ui=log
+	uci set rs485-module.ui.auto_refresh='1'
+	uci set rs485-module.ui.buffer_limit='2000'
+	uci add_list rs485-module.ui.watch_keywords='join'
+	uci add_list rs485-module.ui.watch_keywords='error'
+
+	# protocol section
+	uci set rs485-module.protocol=protocol
+	uci set rs485-module.protocol.enabled='0'
+	uci set rs485-module.protocol.type='modbus-rtu'
+	uci set rs485-module.protocol.device_address='1'
+	uci set rs485-module.protocol.function_code='03'
+	uci set rs485-module.protocol.work_mode='once'
+	uci set rs485-module.protocol.register_address='40001'
+	uci set rs485-module.protocol.data_length='10'
+	uci set rs485-module.protocol.poll_interval='3'
+	uci set rs485-module.protocol.timeout='10'
+	uci set rs485-module.protocol.enable_crc='1'
+	uci set rs485-module.protocol.write_value='0'
+	uci set rs485-module.protocol.standard_mode='1'
+
+	uci commit rs485-module
+fi
+
+exit 0

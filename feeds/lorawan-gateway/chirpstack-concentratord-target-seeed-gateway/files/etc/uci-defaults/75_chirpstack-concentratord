@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# Create chirpstack-concentratord config if not exists
+if [ ! -e "/etc/config/chirpstack-concentratord" ]; then
+	touch /etc/config/chirpstack-concentratord
+
+	uci add chirpstack-concentratord global
+	uci set chirpstack-concentratord.@global[0].enabled='0'
+	uci set chirpstack-concentratord.@global[0].chipset='sx1302'
+
+	uci add chirpstack-concentratord sx1302
+	uci set chirpstack-concentratord.@sx1302[0].model='seeed_wm1302'
+	uci set chirpstack-concentratord.@sx1302[0].region='EU868'
+	uci set chirpstack-concentratord.@sx1302[0].channel_plan='eu868'
+	uci set chirpstack-concentratord.@sx1302[0].gnss='0'
+	uci set chirpstack-concentratord.@sx1302[0].usb='0'
+	uci set chirpstack-concentratord.@sx1302[0].antenna_gain='2'
+	uci set chirpstack-concentratord.@sx1302[0].event_bind='ipc:///tmp/concentratord_event'
+	uci set chirpstack-concentratord.@sx1302[0].command_bind='ipc:///tmp/concentratord_command'
+	uci set chirpstack-concentratord.@sx1302[0].com_dev_path='/dev/spidev0.1'
+	uci set chirpstack-concentratord.@sx1302[0].i2c_dev_path='/dev/i2c-1'
+	uci set chirpstack-concentratord.@sx1302[0].sx1302_reset_pin='2'
+	uci set chirpstack-concentratord.@sx1302[0].sx1302_reset_chip='/dev/gpiochip2'
+	uci set chirpstack-concentratord.@sx1302[0].sx1302_power_en_pin='0'
+	uci set chirpstack-concentratord.@sx1302[0].sx1302_power_en_chip='/dev/gpiochip2'
+	uci set chirpstack-concentratord.@sx1302[0].sx1261_reset_pin='1'
+	uci set chirpstack-concentratord.@sx1302[0].sx1261_reset_chip='/dev/gpiochip2'
+
+	uci commit chirpstack-concentratord
+fi
+
+exit 0

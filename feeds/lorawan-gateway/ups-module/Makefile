@@ -33,8 +33,8 @@ define Package/ups-module/install
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/ups-module.init $(1)/etc/init.d/ups-module
 
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/etc/config/ups-module $(1)/etc/config/ups-module
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/etc/uci-defaults/72_ups-module $(1)/etc/uci-defaults/72_ups-module
 
 	$(INSTALL_DIR) $(1)/etc/ups-uploads
 endef

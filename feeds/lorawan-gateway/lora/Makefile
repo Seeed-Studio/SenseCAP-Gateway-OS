@@ -28,12 +28,8 @@ define Package/lora/conffiles
 endef
 
 define Package/lora/install
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/etc/config/lora.config $(1)/etc/config/lora
-
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
-	$(INSTALL_CONF) ./files/etc/uci-defaults/64_lora_radio $(1)/etc/uci-defaults/64_lora_radio
-	$(INSTALL_CONF) ./files/etc/uci-defaults/65_lora_network $(1)/etc/uci-defaults/65_lora_network
+	$(INSTALL_BIN) ./files/etc/uci-defaults/64_lora_config $(1)/etc/uci-defaults/64_lora_config
 
 	$(INSTALL_DIR) $(1)/etc/lora
 	$(INSTALL_DATA) ./files/etc/lora/freq_plan.json $(1)/etc/lora/freq_plan.json

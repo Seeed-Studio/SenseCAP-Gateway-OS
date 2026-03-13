@@ -1,0 +1,43 @@
+#!/bin/sh
+
+# Create basicstation config if not exists
+if [ ! -e "/etc/config/basicstation" ]; then
+	touch /etc/config/basicstation
+
+	# auth section
+	uci set basicstation.auth=auth
+	uci set basicstation.auth.cred=''
+	uci set basicstation.auth.mode=''
+	uci set basicstation.auth.addr=''
+	uci set basicstation.auth.port=''
+	uci set basicstation.auth.token=''
+	uci set basicstation.auth.key=''
+	uci set basicstation.auth.crt=''
+	uci set basicstation.auth.trust=''
+
+	# sx130x section
+	uci set basicstation.sx130x=sx130x
+	uci set basicstation.sx130x.comif='spi'
+	uci set basicstation.sx130x.devpath='/dev/spidev0.1'
+	uci set basicstation.sx130x.region='US915'
+
+	# station section
+	uci set basicstation.station=station
+	uci set basicstation.station.idGenIf=''
+	uci set basicstation.station.routerid=''
+	uci set basicstation.station.stationid=''
+	uci set basicstation.station.radioInit='/usr/bin/radio_init'
+	uci set basicstation.station.logFile='stderr'
+	uci set basicstation.station.logLevel='DEBUG'
+	uci set basicstation.station.logSize='1000000'
+	uci set basicstation.station.logRotate='3'
+	uci set basicstation.station.whitelist_enable='0'
+	uci set basicstation.station.whitelist_ouis=''
+	uci set basicstation.station.whitelist_netids=''
+	uci set basicstation.station.whitelist_devaddr_min='00000000'
+	uci set basicstation.station.whitelist_devaddr_max='00000000'
+
+	uci commit basicstation
+fi
+
+exit 0

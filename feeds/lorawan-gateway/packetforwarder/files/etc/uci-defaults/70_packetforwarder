@@ -1,0 +1,42 @@
+#!/bin/sh
+
+# Create packetforwarder config if not exists
+if [ ! -e "/etc/config/packetforwarder" ]; then
+	touch /etc/config/packetforwarder
+
+	# sx130x section
+	uci set packetforwarder.sx130x=sx130x
+	uci set packetforwarder.sx130x.region='US915'
+	uci set packetforwarder.sx130x.channel_plan='US_902_928_FSB_2'
+
+	# gateway section
+	uci set packetforwarder.gateway=gateway
+	uci set packetforwarder.gateway.gateway_ID='AA555A0000000000'
+	uci set packetforwarder.gateway.server_address='localhost'
+	uci set packetforwarder.gateway.serv_port_up='1700'
+	uci set packetforwarder.gateway.serv_port_down='1700'
+	uci set packetforwarder.gateway.keepalive_interval='5'
+	uci set packetforwarder.gateway.stat_interval='30'
+	uci set packetforwarder.gateway.stat_report_interval_multiple='1'
+	uci set packetforwarder.gateway.push_timeout_ms='950'
+	uci set packetforwarder.gateway.forward_crc_valid='1'
+	uci set packetforwarder.gateway.forward_crc_error='0'
+	uci set packetforwarder.gateway.forward_crc_disabled='0'
+	uci set packetforwarder.gateway.ref_latitude='0.0'
+	uci set packetforwarder.gateway.ref_longitude='0.0'
+	uci set packetforwarder.gateway.ref_altitude='0'
+	uci set packetforwarder.gateway.beacon_period='0'
+	uci set packetforwarder.gateway.beacon_freq_hz='869525000'
+	uci set packetforwarder.gateway.beacon_datarate='9'
+	uci set packetforwarder.gateway.beacon_bw_hz='125000'
+	uci set packetforwarder.gateway.beacon_power='14'
+	uci set packetforwarder.gateway.beacon_infodesc='0'
+	uci set packetforwarder.gateway.fake_gps='0'
+	uci set packetforwarder.gateway.whitelist_enable='0'
+	uci set packetforwarder.gateway.whitelist_devaddr_min='00000000'
+	uci set packetforwarder.gateway.whitelist_devaddr_max='00000000'
+
+	uci commit packetforwarder
+fi
+
+exit 0

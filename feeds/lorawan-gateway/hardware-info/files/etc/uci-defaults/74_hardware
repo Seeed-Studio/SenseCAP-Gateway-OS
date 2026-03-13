@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# Create hardware config if not exists
+if [ ! -e "/etc/config/hardware" ]; then
+	touch /etc/config/hardware
+
+	uci set hardware.hardware=hardware
+	uci set hardware.hardware.lte_rst_chip='/dev/gpiochip2'
+	uci set hardware.hardware.lte_rst_line='3'
+	uci set hardware.hardware.lte_usb_port='/dev/ttyUSB2'
+	uci set hardware.hardware.ups_gpio_chip='/dev/gpiochip0'
+	uci set hardware.hardware.ups_gpio_line='25'
+	uci set hardware.hardware.lora_com_type='SPI'
+	uci set hardware.hardware.lora_com_path='/dev/spidev0.1'
+	uci set hardware.hardware.sx1302_reset_chip='/dev/gpiochip2'
+	uci set hardware.hardware.sx1302_reset_pin='2'
+	uci set hardware.hardware.sx1302_power_en_chip='/dev/gpiochip2'
+	uci set hardware.hardware.sx1302_power_en_pin='0'
+	uci set hardware.hardware.sx1261_reset_chip='/dev/gpiochip2'
+	uci set hardware.hardware.sx1261_reset_pin='1'
+
+	uci commit hardware
+fi
+
+exit 0

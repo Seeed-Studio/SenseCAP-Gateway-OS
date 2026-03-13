@@ -1,8 +1,0 @@
-config ups 'cmd'
-    list commands 'echo "Power Outage"'
-
-config log 'ui'
-    option auto_refresh '1'
-    option buffer_limit '2000'
-    list watch_keywords 'join'
-    list watch_keywords 'error'

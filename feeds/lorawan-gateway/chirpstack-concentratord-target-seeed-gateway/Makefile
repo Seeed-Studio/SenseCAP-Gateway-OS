@@ -23,8 +23,8 @@ define Package/chirpstack-concentratord-target-seeed-gateway/conffiles
 endef
 
 define Package/chirpstack-concentratord-target-seeed-gateway/install
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/chirpstack-concentratord.config $(1)/etc/config/chirpstack-concentratord
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/etc/uci-defaults/75_chirpstack-concentratord $(1)/etc/uci-defaults/75_chirpstack-concentratord
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/chirpstack-concentratord.init $(1)/etc/init.d/chirpstack-concentratord

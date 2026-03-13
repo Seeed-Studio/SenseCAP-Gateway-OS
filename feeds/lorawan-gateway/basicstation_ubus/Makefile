@@ -52,8 +52,8 @@ endef
 define Package/basicstation_ubus/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/station $(1)/usr/bin
-	$(INSTALL_DIR) $(1)/etc/config
-	$(INSTALL_CONF) ./files/etc/config/basicstation $(1)/etc/config/basicstation
+	$(INSTALL_DIR) $(1)/etc/uci-defaults
+	$(INSTALL_BIN) ./files/etc/uci-defaults/71_basicstation $(1)/etc/uci-defaults/71_basicstation
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/basicstation $(1)/etc/init.d/basicstation
 	$(INSTALL_DIR) $(1)/etc/basicstation
