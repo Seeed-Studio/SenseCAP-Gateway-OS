@@ -8,16 +8,11 @@ USE_PROCD=1
 PROG=/usr/bin/lte-serve.sh
 LTE_INFO_CACHE="/var/run/lte-info.json"
 
-# Check if LTE is enabled via network config
-is_lte_enabled() {
-    local enable
-    enable=$(uci -q get network.LTE.enable)
-    [ "$enable" = "1" ]
-}
-
 start_service() {
     # Only start if LTE is enabled
-    if ! is_lte_enabled; then
+    local enable
+    enable=$(uci -q get network.LTE.enable)
+    if [ "$enable" != "1" ]; then
         logger -t "lte-serve" "LTE is disabled (enable != 1), not starting service"
         # write LTE status to cache
         echo '{"connected":false}' > "$LTE_INFO_CACHE"
