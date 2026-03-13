@@ -143,7 +143,7 @@ get_lte_info_at() {
 
 # Configure wwan0 via AT commands if not present
 configure_wwan0() {
-    local max_wait=30
+    local max_wait=60
     local count=0
 
     # Wait for wwan0 to appear
