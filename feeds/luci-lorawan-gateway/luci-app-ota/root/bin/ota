@@ -189,6 +189,19 @@ do_upgrade() {
         cp -a /etc/config "$BACKUP_DIR/"
     fi
 
+    # Backup user account files
+    for file in /etc/passwd /etc/shadow /etc/group /etc/sudoers; do
+        if [ -f "$file" ]; then
+            cp "$file" "$BACKUP_DIR/"
+        fi
+    done
+
+    # Backup SSH keys
+    if [ -d "/etc/dropbear" ]; then
+        mkdir -p "$BACKUP_DIR/dropbear"
+        cp -a /etc/dropbear/* "$BACKUP_DIR/dropbear/"
+    fi
+
     # Backup marker files
     for marker in /etc/.gateway_configured /etc/.lora_configured /etc/.wifi_configured; do
         if [ -f "$marker" ]; then
@@ -205,6 +218,20 @@ do_upgrade() {
         if [ -d "$BACKUP_DIR/config" ]; then
             cp -a "$BACKUP_DIR/config/"* /etc/config/ 2>/dev/null
         fi
+
+        # Restore user account files
+        for file in passwd shadow group sudoers; do
+            if [ -f "$BACKUP_DIR/$file" ]; then
+                cp "$BACKUP_DIR/$file" "/etc/$file"
+            fi
+        done
+
+        # Restore SSH keys
+        if [ -d "$BACKUP_DIR/dropbear" ]; then
+            mkdir -p /etc/dropbear
+            cp -a "$BACKUP_DIR/dropbear/"* /etc/dropbear/ 2>/dev/null
+        fi
+
         for marker in "$BACKUP_DIR"/.*_configured; do
             if [ -f "$marker" ]; then
                 cp "$marker" /etc/

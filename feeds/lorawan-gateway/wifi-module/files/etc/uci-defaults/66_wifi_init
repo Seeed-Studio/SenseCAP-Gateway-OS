@@ -1,10 +1,24 @@
 #!/bin/sh
 
 SN_FILE="/etc/deviceinfo/sn"
+MARKER="/etc/.wifi_configured"
 
 log_message() {
     logger -t wifi-init "$1"
 }
+
+# Skip if already configured (OTA upgrade case)
+if [ -f "$MARKER" ]; then
+    log_message "WiFi already configured (marker exists), skipping initialization"
+    exit 0
+fi
+
+# Skip if wireless config already exists and has content
+if [ -f "/etc/config/wireless" ] && grep -q "wifi-iface" /etc/config/wireless 2>/dev/null; then
+    log_message "WiFi config already exists, skipping initialization"
+    touch "$MARKER"
+    exit 0
+fi
 
 log_message "Starting WiFi initialization"
 
@@ -68,5 +82,8 @@ rm -rf /tmp/luci-*
 /etc/init.d/uhttpd restart
 
 log_message "Default AP initialized: SSID=$ssid, Password=1234567890"
+
+# Create marker file to indicate WiFi is configured
+touch "$MARKER"
 
 exit 0
