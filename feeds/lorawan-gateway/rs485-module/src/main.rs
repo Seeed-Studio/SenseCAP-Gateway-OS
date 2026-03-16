@@ -12,6 +12,29 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::time::sleep;
 use tokio_serial::{DataBits, Parity, StopBits, SerialPortBuilderExt};
 
+/// Initialize timezone from UCI system configuration
+fn init_timezone() {
+    match Command::new("uci")
+        .args(&["get", "system.@system[0].timezone"])
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            if let Ok(tz) = String::from_utf8(output.stdout) {
+                let tz = tz.trim();
+                if !tz.is_empty() && tz != "UTC" {
+                    std::env::set_var("TZ", tz);
+                    // Notify that timezone was loaded
+                    eprintln!("Timezone set from UCI: {}", tz);
+                }
+            }
+        }
+        _ => {
+            // Fallback to UTC if UCI read fails
+            std::env::set_var("TZ", "UTC");
+        }
+    }
+}
+
 // Mqtt and Serial Configuration Structures
 #[derive(Debug, Clone, PartialEq)]
 struct Config {
@@ -437,6 +460,9 @@ async fn setup_serial(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Initialize timezone from UCI system configuration
+    init_timezone();
+
     // Initialize logger
     let logger = Arc::new(Logger::new());
     logger.init()?;
