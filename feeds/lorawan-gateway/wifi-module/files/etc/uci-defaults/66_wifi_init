@@ -7,16 +7,9 @@ log_message() {
     logger -t wifi-init "$1"
 }
 
-# Skip if already configured (OTA upgrade case)
+# Only configure if marker does not exist
 if [ -f "$MARKER" ]; then
     log_message "WiFi already configured (marker exists), skipping initialization"
-    exit 0
-fi
-
-# Skip if wireless config already exists and has content
-if [ -f "/etc/config/wireless" ] && grep -q "wifi-iface" /etc/config/wireless 2>/dev/null; then
-    log_message "WiFi config already exists, skipping initialization"
-    touch "$MARKER"
     exit 0
 fi
 
