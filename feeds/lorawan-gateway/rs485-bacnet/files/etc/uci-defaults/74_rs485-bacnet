@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# BACnet MS/TP configuration defaults
+
+. /lib/functions.sh
+
+config_load "rs485-module"
+
+# Add BACnet section if not exists
+if ! uci -q get rs485-module.bacnet >/dev/null 2>&1; then
+    uci batch <<EOF
+set rs485-module.bacnet='bacnet'
+set rs485-module.bacnet.enabled='0'
+set rs485-module.bacnet.device_mac='1'
+set rs485-module.bacnet.max_master='127'
+set rs485-module.bacnet.max_info_frames='1'
+set rs485-module.bacnet.reply_timeout='200'
+set rs485-module.bacnet.timeout_multiplier='3'
+set rs485-module.bacnet.token_hold_time='10'
+set rs485-module.bacnet.polling_interval='5'
+set rs485-module.bacnet.work_mode='once'
+set rs485-module.bacnet.object_type='analogInput'
+set rs485-module.bacnet.object_instance='0'
+set rs485-module.bacnet.property_identifier='presentValue'
+commit rs485-module
+EOF
+fi
+
+exit 0

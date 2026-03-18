@@ -1,0 +1,32 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+STOP=10
+
+USE_PROCD=1
+PROG=/usr/bin/rs485-bacnet
+
+start_service() {
+    local serial_enabled bacnet_enabled
+    serial_enabled=$(uci -q get rs485-module.serial.enabled)
+    bacnet_enabled=$(uci -q get rs485-module.bacnet.enabled)
+
+    # Only start if serial enabled and bacnet enabled
+    [ "$serial_enabled" = "1" ] || return 0
+    [ "$bacnet_enabled" = "1" ] || return 0
+
+    # Create trigger directories
+    mkdir -p /tmp/rs485
+
+    procd_open_instance
+    procd_set_param command $PROG
+    procd_set_param file /etc/config/rs485-module
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
+    procd_close_instance
+}
+
+service_triggers() {
+    procd_add_reload_trigger "rs485-module"
+}

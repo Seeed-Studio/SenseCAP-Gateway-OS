@@ -78,19 +78,119 @@ return view.extend({
         o.value('modbus-rtu', 'Modbus RTU');
         o.value('bacnet-mstp', 'BACnet MS/TP');
         o.default = 'modbus-rtu';
-        o.validate = function(section_id, value) {
-            if (value === 'bacnet-mstp') {
-                return _('BACnet MS/TP is not supported yet. Please select Modbus RTU.');
-            }
-            return true;
+
+        // ===== BACnet MS/TP Configuration =====
+        o = s.option(form.Flag, '_bacnet_info', _('BACnet MS/TP Info'));
+        o.depends('type', 'bacnet-mstp');
+        o.default = '1';
+        o.cfgvalue = function() { return '1'; };
+        o.readonly = true;
+        o.description = _('BACnet MS/TP protocol is handled by the rs485-bacnet service. Make sure the service is enabled and running.');
+
+        // BACnet Device MAC Address
+        o = s.option(form.Value, 'bacnet_device_mac', _('Device MAC Address'),
+            _('The MAC address (0-255) of this BACnet device.'));
+        o.depends('type', 'bacnet-mstp');
+        o.datatype = 'range(0,255)';
+        o.placeholder = '5';
+        o.default = '5';
+        o.rmempty = false;
+
+        // BACnet Poll Mode
+        o = s.option(form.ListValue, 'bacnet_poll_mode', _('Poll Mode'));
+        o.depends('type', 'bacnet-mstp');
+        o.value('trigger', _('Trigger Mode'));
+        o.value('poll', _('Poll Mode'));
+        o.default = 'trigger';
+        o.description = _('Trigger: Read on demand via trigger file. Poll: Read periodically at configured interval.');
+
+        // BACnet Poll Interval
+        o = s.option(form.Value, 'bacnet_poll_interval', _('Poll Interval (seconds)'),
+            _('How often to poll BACnet devices (in poll mode).'));
+        o.depends({'type': 'bacnet-mstp', 'bacnet_poll_mode': 'poll'});
+        o.datatype = 'range(1,3600)';
+        o.placeholder = '60';
+        o.default = '60';
+        o.rmempty = false;
+
+        // BACnet Object Type
+        o = s.option(form.ListValue, 'bacnet_object_type', _('Object Type'));
+        o.depends('type', 'bacnet-mstp');
+        o.value('analogInput', 'analogInput');
+        o.value('analogOutput', 'analogOutput');
+        o.value('binaryInput', 'binaryInput');
+        o.value('binaryOutput', 'binaryOutput');
+        o.default = 'analogInput';
+
+        // BACnet Object Instance
+        o = s.option(form.Value, 'bacnet_object_instance', _('Object Instance'),
+            _('The object instance number to read from.'));
+        o.depends('type', 'bacnet-mstp');
+        o.datatype = 'range(0,4194303)';
+        o.placeholder = '0';
+        o.default = '0';
+        o.rmempty = false;
+
+        // BACnet Property Identifier
+        o = s.option(form.Value, 'bacnet_property', _('Property Identifier'),
+            _('The property to read from the object.'));
+        o.depends('type', 'bacnet-mstp');
+        o.value('presentValue', 'presentValue');
+        o.value('statusFlags', 'statusFlags');
+        o.value('description', 'description');
+        o.default = 'presentValue';
+        o.rmempty = false;
+
+        // BACnet Trigger Read Button
+        o = s.option(form.Button, '_bacnet_read_btn', _('Read BACnet Data'));
+        o.depends({'type': 'bacnet-mstp', 'bacnet_poll_mode': 'trigger'});
+        o.inputtitle = _('Read Now');
+        o.inputstyle = 'apply';
+        o.description = _('Create trigger file to read BACnet data once.');
+        o.onclick = L.bind(function(ev) {
+            var btn = ev.target;
+            btn.disabled = true;
+            btn.innerText = _('Reading...');
+            return fs.exec('/bin/sh', ['-c', 'rm -f /tmp/rs485/bacnet_result && mkdir -p /tmp/rs485 && touch /tmp/rs485/bacnet_read'])
+                .then(function() {
+                    var pollCount = 0;
+                    var pollInterval = setInterval(function() {
+                        pollCount++;
+                        L.resolveDefault(fs.read('/tmp/rs485/bacnet_result'))
+                            .then(function(content) {
+                                if (content) {
+                                    clearInterval(pollInterval);
+                                    alert(_('BACnet Result: ') + content);
+                                    btn.disabled = false;
+                                    btn.innerText = _('Read Now');
+                                    fs.exec('/bin/sh', ['-c', 'rm -f /tmp/rs485/bacnet_read /tmp/rs485/bacnet_result']);
+                                }
+                            })
+                            .catch(function() {
+                                if (pollCount >= 50) {
+                                    clearInterval(pollInterval);
+                                    alert(_('Timeout: No response from BACnet service'));
+                                    btn.disabled = false;
+                                    btn.innerText = _('Read Now');
+                                    fs.exec('/bin/sh', ['-c', 'rm -f /tmp/rs485/bacnet_read /tmp/rs485/bacnet_result']);
+                                }
+                            });
+                    }, 100);
+                });
+        }, this);
+
+        // BACnet Result Display
+        o = s.option(form.DummyValue, '_bacnet_result', _('BACnet Data'));
+        o.depends('type', 'bacnet-mstp');
+        o.rawhtml = true;
+        o.cfgvalue = function() {
+            return '<div style="margin-top:10px;">' +
+                   '<p><strong>Note:</strong> BACnet data is published to MQTT topic: <code>rs485/bacnet/uplink</code></p>' +
+                   '<p>Use MQTT Subscribe to monitor data in real-time.</p>' +
+                   '</div>';
         };
 
-        // Development notice for BACnet MS/TP
-        o = s.option(form.DummyValue, '_bacnet_notice', _('Notice'));
-        o.depends('type', 'bacnet-mstp');
-        o.cfgvalue = function() {
-            return _('The function is under development, please pay attention to subsequent OTA updates.');
-        };
+        // ===== Modbus RTU Configuration (existing) =====
 
         o = s.option(form.Value, 'device_address', _('Device Address (Slave ID)'), _('Value can be entered in hexadecimal (0x) or decimal format.'));
         o.depends('type', 'modbus-rtu');
@@ -413,8 +513,40 @@ return view.extend({
             var originalHandleSave = m.handleSave;
             m.handleSave = function() {
                 return originalHandleSave.apply(this, arguments).then(function(result) {
-                    startPeriodicRead();
-                    return result;
+                    // Handle BACnet configuration sync
+                    // When protocol type is bacnet-mstp, copy settings to bacnet section
+                    return uci.load('rs485-module').then(function() {
+                        var protocolType = uci.get('rs485-module', 'protocol', 'type');
+
+                        if (protocolType === 'bacnet-mstp') {
+                            // Enable BACnet section
+                            uci.set('rs485-module', 'bacnet', 'bacnet');
+                            uci.set('rs485-module', 'bacnet', 'enabled', '1');
+
+                            // Copy device MAC
+                            var mac = uci.get('rs485-module', 'protocol', 'bacnet_device_mac');
+                            if (mac) uci.set('rs485-module', 'bacnet', 'device_mac', mac);
+
+                            // Copy poll mode
+                            var pollMode = uci.get('rs485-module', 'protocol', 'bacnet_poll_mode');
+                            if (pollMode) uci.set('rs485-module', 'bacnet', 'poll_mode', pollMode);
+
+                            // Copy poll interval
+                            var pollInterval = uci.get('rs485-module', 'protocol', 'bacnet_poll_interval');
+                            if (pollInterval) uci.set('rs485-module', 'bacnet', 'poll_interval', pollInterval);
+
+                            uci.save();
+                            uci.apply();
+                        } else {
+                            // Disable BACnet section when not in use
+                            uci.set('rs485-module', 'bacnet', 'enabled', '0');
+                            uci.save();
+                            uci.apply();
+                        }
+
+                        startPeriodicRead();
+                        return result;
+                    });
                 });
             };
             
