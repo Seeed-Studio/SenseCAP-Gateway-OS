@@ -48,16 +48,13 @@ define Package/bacnet-stack/install
 	$(INSTALL_DIR) $(1)/usr/bin
 
 	# server daemon
-	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/bacserv       $(1)/usr/bin/ 2>/dev/null || \
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/build/apps/server-basic/bacserv $(1)/usr/bin/ 2>/dev/null || \
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bin/bacserv              $(1)/usr/bin/ 2>/dev/null || true
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bacbasic $(1)/usr/bin/bacserv
 
 	# CLI tools (install any that were built)
-	for t in bacwhois bacepics bacrp bacwp; do \
-		if [ -f $(PKG_INSTALL_DIR)/usr/bin/$$$$t ]; then \
-			$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/$$$$t $(1)/usr/bin/; \
-		fi; \
-	done
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/whois $(1)/usr/bin/bacwhois || true
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/epics $(1)/usr/bin/bacepics || true
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/readprop $(1)/usr/bin/bacrp || true
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/writeprop $(1)/usr/bin/bacwp || true
 endef
 
 $(eval $(call BuildPackage,bacnet-stack))
