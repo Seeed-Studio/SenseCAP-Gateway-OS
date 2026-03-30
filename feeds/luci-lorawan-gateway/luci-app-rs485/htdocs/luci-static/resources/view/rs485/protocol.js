@@ -88,8 +88,9 @@ return view.extend({
         // Development notice for BACnet MS/TP
         o = s.option(form.DummyValue, '_bacnet_notice', _('Notice'));
         o.depends('type', 'bacnet-mstp');
+        o.rawhtml = true;
         o.cfgvalue = function() {
-            return _('The function is under development, please pay attention to subsequent OTA updates.');
+            return _('BACnet Web configuration is under development. Please follow upcoming OTA updates. <br>It can be accessed via the <code>bacserv</code> command in the <a href="/cgi-bin/luci/admin/system/ttyd">LNX container terminal</a>.');
         };
 
         o = s.option(form.Value, 'device_address', _('Device Address (Slave ID)'), _('Value can be entered in hexadecimal (0x) or decimal format.'));
