@@ -1,14 +1,14 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=bacnet-stack
-PKG_VERSION:=1.5.0
+PKG_VERSION:=1.4.2
 PKG_RELEASE:=1
 
-PKG_SOURCE:=$(PKG_VERSION).tar.gz
+PKG_SOURCE:=bacnet-stack-$(PKG_VERSION).tar.gz
 PKG_SOURCE_URL:=https://github.com/bacnet-stack/bacnet-stack/archive/refs/tags/
 PKG_HASH:=skip
 
-PKG_BUILD_DIR:=$(BUILD_DIR)/bacnet-stack-$(PKG_VERSION)
+PKG_BUILD_DIR:=$(BUILD_DIR)/bacnet-stack-bacnet-stack-$(PKG_VERSION)
 PKG_BUILD_PARALLEL:=1
 
 CMAKE_INSTALL:=1
