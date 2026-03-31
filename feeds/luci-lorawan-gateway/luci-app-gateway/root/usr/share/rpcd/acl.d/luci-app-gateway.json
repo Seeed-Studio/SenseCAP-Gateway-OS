@@ -30,6 +30,9 @@
                 "/var/run/lte-info.json": [
                     "read"
                 ],
+                "/etc/deviceinfo/os_version": [
+                    "read"
+                ],
                 "/bin/cat /etc/deviceinfo/sn": [
                     "exec"
                 ],
@@ -46,6 +49,9 @@
                     "exec"
                 ],
                 "/bin/cat /var/run/lte-info.json": [
+                    "exec"
+                ],
+                "/bin/cat /etc/deviceinfo/os_version": [
                     "exec"
                 ]
             }

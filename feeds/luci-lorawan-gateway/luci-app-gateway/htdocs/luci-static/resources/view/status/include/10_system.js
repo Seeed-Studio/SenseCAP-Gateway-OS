@@ -66,7 +66,12 @@ return baseclass.extend({
 			}).catch(function() {
 				return '';
 			}),
-			getLTEInfo
+			getLTEInfo,
+			fs.exec('/bin/cat', ['/etc/deviceinfo/os_version']).then(function(res) {
+				return res.stdout || '';
+			}).catch(function() {
+				return '';
+			})
 		]);
 	},
 
@@ -79,7 +84,8 @@ return baseclass.extend({
 		    versionText = data[5] || '',
 		    freqPlan    = data[6] ? data[6].trim() : '',
 		    hwName      = data[7] ? data[7].trim() : '',
-		    lteInfo     = data[8] || {};
+		    lteInfo     = data[8] || {},
+		    osVersion   = data[9] ? data[9].trim() : '';
 
 		// LTE fields - only show if connected
 		var lteConnected = (lteInfo.connected === 'true' || lteInfo.connected === true);
@@ -122,7 +128,7 @@ return baseclass.extend({
 			_('SN'),               sn || '-',
 			_('EUI'),              eui || '-',
 			_('Build Version'),    (L.isObject(boardinfo.release) ? boardinfo.release.description + ' / ' : '') + (luciversion || ''),
-			_('OS Version'),       (L.isObject(boardinfo.release) ? boardinfo.release.target : ''),
+			_('OS Version'),       osVersion || '-',
 			_('Target Platform'),  (L.isObject(boardinfo.release) ? boardinfo.release.target : ''),
 			_('Firmware Version'), firmwareVersion || '-',
 			_('Kernel Version'),   boardinfo.kernel,
