@@ -1,0 +1,20 @@
+--- a/src/bacnet/basic/server/bacnet_port_mstp.c
++++ b/src/bacnet/basic/server/bacnet_port_mstp.c
+@@ -40,10 +40,16 @@
+  */
+ bool bacnet_port_mstp_init(void)
+ {
+     uint32_t instance = 1;
++    const char *ifname = NULL;
+     BACNET_ADDRESS addr = { 0 };
+ 
+-    if (!dlmstp_init(NULL)) {
++    ifname = getenv("BACNET_IFACE");
++    if (!ifname || !ifname[0]) {
++        ifname = getenv("BACNET_MSTP_IFACE");
++    }
++
++    if (!dlmstp_init((char *)ifname)) {
+         return false;
+     }
+     Network_Port_Object_Instance_Number_Set(0, instance);

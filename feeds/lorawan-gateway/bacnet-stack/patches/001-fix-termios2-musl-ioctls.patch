@@ -1,0 +1,12 @@
+--- a/ports/linux/termios2.h
++++ b/ports/linux/termios2.h
+@@ -3,6 +3,9 @@
+ 
+ #define termios asmtermios /*avoid conflicts with others including termios.h*/
+ #include <asm/termbits.h>
++/* TCGETS2/TCSETS2/TCSETSW2/TCSETSF2 are in asm-generic/ioctls.h;
++   not pulled in automatically by musl's asm/termbits.h */
++#include <asm-generic/ioctls.h>
+ #undef termios
+ 
+ #ifdef __cplusplus
