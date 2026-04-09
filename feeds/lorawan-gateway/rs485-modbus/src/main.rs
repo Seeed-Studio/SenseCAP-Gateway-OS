@@ -63,7 +63,7 @@ struct SerialConfig {
 struct ProtocolConfig {
     device_address: u8,
     function_code: u8,
-    register_address: u16,
+    register_addresses: Vec<u16>,
     data_length: u16,
     write_value: String,
     standard_mode: bool,
@@ -257,10 +257,19 @@ fn load_config_from_uci() -> Result<Config, Box<dyn std::error::Error + Send + S
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(3);
-    let register_address = uci_get("rs485-module", "protocol", "register_address")
+    let register_addresses: Vec<u16> = uci_get("rs485-module", "protocol", "register_address")
         .ok()
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(40001);
+        .map(|s| {
+            s.split(',')
+                .filter_map(|part| part.trim().parse::<u16>().ok())
+                .collect::<Vec<u16>>()
+        })
+        .unwrap_or_default();
+    let register_addresses = if register_addresses.is_empty() {
+        vec![40001]
+    } else {
+        register_addresses
+    };
     let data_length = uci_get("rs485-module", "protocol", "data_length")
         .ok()
         .and_then(|s| s.parse().ok())
@@ -290,7 +299,7 @@ fn load_config_from_uci() -> Result<Config, Box<dyn std::error::Error + Send + S
     let protocol_config = ProtocolConfig {
         device_address,
         function_code,
-        register_address,
+        register_addresses,
         data_length,
         write_value,
         standard_mode,
@@ -501,10 +510,11 @@ async fn read_modbus_data(
     logger: &Arc<Logger>,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
     ctx.set_slave(Slave(config.device_address));
-    let addr = config.register_address as u16;
+    let first_addr = config.register_addresses[0];
     
     // For write operations (FC05/06/15/16), check if non-standard mode is enabled
     if matches!(config.function_code, 5 | 6 | 15 | 16) && !config.standard_mode {
+        let addr = first_addr;
         // Non-standard mode: parse space-separated hex data (e.g., "00 5A")
         let write_val_str = config.write_value.trim();
         let parts: Vec<&str> = write_val_str.split_whitespace().collect();
@@ -637,32 +647,49 @@ async fn read_modbus_data(
     }
 
     // Standard Modbus operations (for read operations or standard mode write operations)
+    let addr = first_addr;
     match config.function_code {
         3 => {
-            let data = ctx.read_holding_registers(addr, config.data_length as u16).await??;
-            Ok(format!("Registers: [{}]", 
-                data.iter().map(|v| format!("0x{:04X}", *v)).collect::<Vec<_>>().join(", ")))
+            let mut entries: Vec<String> = Vec::new();
+            for &a in &config.register_addresses {
+                let data = ctx.read_holding_registers(a, config.data_length as u16).await??;
+                let values = data.iter().map(|v| format!("\"0x{:04X}\"", *v)).collect::<Vec<_>>().join(", ");
+                entries.push(format!("    \"{}\": [{}]", a, values));
+            }
+            Ok(format!("{{\n{}\n}}", entries.join(",\n")))
         }
         4 => {
-            let data = ctx.read_input_registers(addr, config.data_length as u16).await??;
-            Ok(format!("Registers: [{}]", 
-                data.iter().map(|v| format!("0x{:04X}", *v)).collect::<Vec<_>>().join(", ")))
+            let mut entries: Vec<String> = Vec::new();
+            for &a in &config.register_addresses {
+                let data = ctx.read_input_registers(a, config.data_length as u16).await??;
+                let values = data.iter().map(|v| format!("\"0x{:04X}\"", *v)).collect::<Vec<_>>().join(", ");
+                entries.push(format!("    \"{}\": [{}]", a, values));
+            }
+            Ok(format!("{{\n{}\n}}", entries.join(",\n")))
         }
         1 => {
-            let data = ctx.read_coils(addr, config.data_length as u16).await??;
-            Ok(format!("Coils: [{}]", 
-                data.iter().map(|v| if *v { "1" } else { "0" }).collect::<Vec<_>>().join(", ")))
+            let mut entries: Vec<String> = Vec::new();
+            for &a in &config.register_addresses {
+                let data = ctx.read_coils(a, config.data_length as u16).await??;
+                let values = data.iter().map(|v| if *v { "1" } else { "0" }).collect::<Vec<_>>().join(", ");
+                entries.push(format!("    \"{}\": [{}]", a, values));
+            }
+            Ok(format!("{{\n{}\n}}", entries.join(",\n")))
         }
         2 => {
-            let data = ctx.read_discrete_inputs(addr, config.data_length as u16).await??;
-            Ok(format!("Coils: [{}]", 
-                data.iter().map(|v| if *v { "1" } else { "0" }).collect::<Vec<_>>().join(", ")))
+            let mut entries: Vec<String> = Vec::new();
+            for &a in &config.register_addresses {
+                let data = ctx.read_discrete_inputs(a, config.data_length as u16).await??;
+                let values = data.iter().map(|v| if *v { "1" } else { "0" }).collect::<Vec<_>>().join(", ");
+                entries.push(format!("    \"{}\": [{}]", a, values));
+            }
+            Ok(format!("{{\n{}\n}}", entries.join(",\n")))
         }
         5 => {
             // Write Single Coil
             let value = config.write_value.trim().parse::<u16>().unwrap_or(0) != 0;
             ctx.write_single_coil(addr, value).await??;
-            Ok(format!("Coils: [{}]", value))
+            Ok(format!("{{\n    \"{}\": [{}]\n}}", addr, value))
         }
         6 => {
             // Write Single Register
@@ -672,7 +699,7 @@ async fn read_modbus_data(
                 config.write_value.trim().parse::<u16>().unwrap_or(0)
             };
             ctx.write_single_register(addr, value).await??;
-            Ok(format!("Registers: [0x{:04X}]", value))
+            Ok(format!("{{\n    \"{}\": [\"0x{:04X}\"]\n}}", addr, value))
         }
         15 => {
             let values: Vec<bool> = config.write_value.trim().split(',')
@@ -683,7 +710,7 @@ async fn read_modbus_data(
                 return Err("No valid values provided for Write Multiple Coils".into());
             }
             ctx.write_multiple_coils(addr, &values).await??;
-            Ok(format!("Coils: [{}]", 
+            Ok(format!("{{\n    \"{}\": [{}]\n}}", addr,
                 values.iter().map(|v| if *v { "1" } else { "0" }).collect::<Vec<_>>().join(", ")))
         }
         16 => {
@@ -702,8 +729,8 @@ async fn read_modbus_data(
                 return Err("No valid values provided for Write Multiple Registers".into());
             }
             ctx.write_multiple_registers(addr, &values).await??;
-            Ok(format!("Registers: [{}]", 
-                values.iter().map(|v| format!("0x{:04X}", *v)).collect::<Vec<_>>().join(", ")))
+            Ok(format!("{{\n    \"{}\": [{}]\n}}", addr,
+                values.iter().map(|v| format!("\"0x{:04X}\"", *v)).collect::<Vec<_>>().join(", ")))
         }
         _ => {
             Err(format!("Unsupported function code: {}", config.function_code).into())
