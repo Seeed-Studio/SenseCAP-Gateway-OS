@@ -48,7 +48,16 @@ SenseCAP Gateway OS 是一款面向工业室内场景的多协议物联网网关
 
 ## 推荐硬件
 
-![reComputer R1225](docs/images/recommended_hardware.png)
+<p align="center">
+  <img src="docs/images/recommended_hardware.png" width="700" />
+</p>
+
+| **设备** | **链接** |
+| --- | --- |
+| reComputer R1225 LoRaWAN 网关 & 工业控制器 (US915-4G) | [购买](https://www.seeedstudio.com/reComputer-R1225-LoRaWAN-Gateway-Industrial-Controller-US915-4G-p-6721.html) |
+| reComputer R1225 LoRaWAN 网关 & 工业控制器 (US915) | [购买](https://www.seeedstudio.com/reComputer-R1225-LoRaWAN-Gateway-Industrial-Controller-US915-p-6722.html) |
+| reComputer R1225 LoRaWAN 网关 & 工业控制器 (EU868-4G) | [购买](https://www.seeedstudio.com/reComputer-R1225-LoRaWAN-Gateway-Industrial-Controller-EU868-4G-p-6719.html) |
+| reComputer R1225 LoRaWAN 网关 & 工业控制器 (EU868) | [购买](https://www.seeedstudio.com/reComputer-R1225-LoRaWAN-Gateway-Industrial-Controller-EU868-p-6720.html) |
 
 reComputer R1225 Wiki：<https://wiki.seeedstudio.com/r1225_introduction/>
 

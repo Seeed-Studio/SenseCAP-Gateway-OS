@@ -47,7 +47,16 @@ The system adopts an innovative lightweight architecture combining a Debian host
 
 ## Recommended Hardware
 
-![reComputer R1225](docs/images/recommended_hardware.png)
+<p align="center">
+  <img src="docs/images/recommended_hardware.png" width="700" />
+</p>
+
+| **Device** | **Link** |
+| --- | --- |
+| reComputer R1225 LoRaWAN Gateway & Industrial Controller (US915-4G) | [Get one](https://www.seeedstudio.com/reComputer-R1225-LoRaWAN-Gateway-Industrial-Controller-US915-4G-p-6721.html) |
+| reComputer R1225 LoRaWAN Gateway & Industrial Controller (US915) | [Get one](https://www.seeedstudio.com/reComputer-R1225-LoRaWAN-Gateway-Industrial-Controller-US915-p-6722.html) |
+| reComputer R1225 LoRaWAN Gateway & Industrial Controller (EU868-4G) | [Get one](https://www.seeedstudio.com/reComputer-R1225-LoRaWAN-Gateway-Industrial-Controller-EU868-4G-p-6719.html) |
+| reComputer R1225 LoRaWAN Gateway & Industrial Controller (EU868) | [Get one](https://www.seeedstudio.com/reComputer-R1225-LoRaWAN-Gateway-Industrial-Controller-EU868-p-6720.html) |
 
 Wiki of reComputer R1225: <https://wiki.seeedstudio.com/r1225_introduction/>
 
