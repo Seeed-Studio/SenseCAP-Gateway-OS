@@ -12,8 +12,6 @@ SenseCAP Gateway OS 是一款面向工业室内场景的多协议物联网网关
 
 [English](README.md) | [中文](README_zh-CN.md) | [日本語](README_ja.md) | [Français](README_fr.md) | [Português](README_pt.md) | [Español](README_es.md)
 
-![badges](docs/images/badges.png)
-
 ## 目录
 
 - [特性](#特性)
