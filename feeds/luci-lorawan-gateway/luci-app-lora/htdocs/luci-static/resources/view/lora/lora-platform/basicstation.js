@@ -56,11 +56,13 @@ return view.extend({
         o = s.taboption('general', form.FileUpload, 'crt', _('Private station certificate'));
         o.optional = false;
         o.rmempty = false;
+        o.root_directory = '/etc/basicstation/certs/client';
         o.depends({ mode: "serverAndClient" });
 
         o = s.taboption('general', form.FileUpload, 'trust', _('CA certificate'));
         o.optional = false;
         o.rmempty = false;
+        o.root_directory = '/etc/basicstation/certs/ca';
         o.depends({ mode: "no", "!reverse": true });
 
         // packet_filter tab
