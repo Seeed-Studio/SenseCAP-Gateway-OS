@@ -1,0 +1,58 @@
+#!/bin/sh
+
+# Create per-port sections for the new unified serial interface
+# Each RS485 port gets its own protocol configuration
+
+for port in 1 2 3; do
+	sid="port${port}"
+	existing=$(uci -q get rs485-module.${sid} 2>/dev/null)
+	if [ -z "$existing" ]; then
+		uci set rs485-module.${sid}=port
+		uci set rs485-module.${sid}.enabled='0'
+		uci set rs485-module.${sid}.baudrate='9600'
+		uci set rs485-module.${sid}.databit='8'
+		uci set rs485-module.${sid}.stopbit='1'
+		uci set rs485-module.${sid}.checkbit='none'
+		uci set rs485-module.${sid}.flowcontrol='none'
+		uci set rs485-module.${sid}.timeout='1000'
+		uci set rs485-module.${sid}.protocol='none'
+
+		# MQTT defaults
+		uci set rs485-module.${sid}.mqtt_transport='tcp'
+		uci set rs485-module.${sid}.mqtt_host=''
+		uci set rs485-module.${sid}.mqtt_port='1883'
+		uci set rs485-module.${sid}.mqtt_client_id=''
+		uci set rs485-module.${sid}.mqtt_keepalive='30'
+		uci set rs485-module.${sid}.mqtt_username=''
+		uci set rs485-module.${sid}.mqtt_password=''
+		uci set rs485-module.${sid}.mqtt_auth_mode='none'
+		uci set rs485-module.${sid}.mqtt_uplink_topic="rs485/RS485-${port}/uplink"
+		uci set rs485-module.${sid}.mqtt_downlink_topic="rs485/RS485-${port}/downlink"
+		uci set rs485-module.${sid}.mqtt_qos='0'
+		uci set rs485-module.${sid}.mqtt_clean_session='1'
+		uci set rs485-module.${sid}.mqtt_reconnect_delay='5'
+
+		# Modbus RTU defaults
+		uci set rs485-module.${sid}.modbus_device_address='1'
+		uci set rs485-module.${sid}.modbus_function_code='03'
+		uci set rs485-module.${sid}.modbus_register_address='40001'
+		uci set rs485-module.${sid}.modbus_data_length='10'
+		uci set rs485-module.${sid}.modbus_enable_crc='1'
+		uci set rs485-module.${sid}.modbus_work_mode='once'
+		uci set rs485-module.${sid}.modbus_poll_interval='3'
+		uci set rs485-module.${sid}.modbus_timeout='10'
+		uci set rs485-module.${sid}.modbus_write_value='0'
+		uci set rs485-module.${sid}.modbus_standard_mode='1'
+
+		# BACnet MS/TP defaults
+		uci set rs485-module.${sid}.bacnet_mac_address='1'
+		uci set rs485-module.${sid}.bacnet_max_master='127'
+		uci set rs485-module.${sid}.bacnet_max_info_frames='1'
+		uci set rs485-module.${sid}.bacnet_device_instance='1234'
+		uci set rs485-module.${sid}.bacnet_device_name='SenseCAP Gateway'
+	fi
+done
+
+uci commit rs485-module
+
+exit 0
