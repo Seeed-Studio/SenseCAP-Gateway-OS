@@ -286,8 +286,6 @@ return view.extend({
     },
 
     load: function () {
-        var platform = uci.get('lora', 'radio', 'platform') || 'chirpstack';
-        var region = uci.get('lora', 'radio', 'region') || 'EU868';
         uci.load('basicstation');
         uci.load('packetforwarder');
         return uci.load('lora');
@@ -316,11 +314,6 @@ return view.extend({
             }
         }
 
-        var platform = uci.get('lora', 'radio', 'platform') || 'chirpstack';
-        console.log("platform:", platform);
-        if (platform === 'basic_station') {
-            return m.render();
-        }
         valid_regions.forEach(function (r) {
             var plans = freq_plan_table[r].plans;
             var o = s.option(form.ListValue, 'channel_plan_' + r, _('Channel-plan'), _('Select the channel-plan to use. This must be supported by the selected shield.'));

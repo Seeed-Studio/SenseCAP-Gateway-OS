@@ -61,17 +61,6 @@ define Package/bacnet-stack/install
 	-$(INSTALL_BIN) $(CMAKE_BUILD_DIR)/epics     $(1)/usr/bin/bacepics
 	-$(INSTALL_BIN) $(CMAKE_BUILD_DIR)/readprop  $(1)/usr/bin/bacrp
 	-$(INSTALL_BIN) $(CMAKE_BUILD_DIR)/writeprop $(1)/usr/bin/bacwp
-
-	# helper script: source UCI config as env vars, then exec a command
-	$(INSTALL_BIN) ./files/usr/bin/bacnet-env $(1)/usr/bin/bacnet-env
-
-	# init script
-	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/bacnet.init $(1)/etc/init.d/bacnet
-
-	# UCI defaults
-	$(INSTALL_DIR) $(1)/etc/uci-defaults
-	$(INSTALL_CONF) ./files/etc/uci-defaults/74_bacnet $(1)/etc/uci-defaults/74_bacnet
 endef
 
 $(eval $(call BuildPackage,bacnet-stack))

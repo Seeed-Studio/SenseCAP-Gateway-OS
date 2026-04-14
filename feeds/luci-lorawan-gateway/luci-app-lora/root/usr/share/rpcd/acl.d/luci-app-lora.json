@@ -11,6 +11,22 @@
                 ],
                 "/etc/device_eui": [
                     "read"
+                ],
+                "/etc/basicstation/certs/client/*": [
+                    "list",
+                    "read"
+                ],
+                "/etc/basicstation/certs/key/*": [
+                    "list",
+                    "read"
+                ],
+                "/etc/basicstation/certs/ca/*": [
+                    "list",
+                    "read"
+                ],
+                "/etc/basicstation/token/*": [
+                    "list",
+                    "read"
                 ]
             },
             "ubus": {
@@ -40,6 +56,18 @@
                 ],
                 "/etc/init.d/chirpstack-gateway-bridge": [
                     "exec"
+                ],
+                "/etc/basicstation/certs/client/*": [
+                    "write"
+                ],
+                "/etc/basicstation/certs/key/*": [
+                    "write"
+                ],
+                "/etc/basicstation/certs/ca/*": [
+                    "write"
+                ],
+                "/etc/basicstation/token/*": [
+                    "write"
                 ]
             },
             "ubus": {

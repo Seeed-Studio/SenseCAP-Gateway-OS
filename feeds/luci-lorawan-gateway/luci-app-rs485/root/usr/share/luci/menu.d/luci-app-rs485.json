@@ -12,27 +12,11 @@
 		"action": {
 			"type": "view",
 			"path": "rs485/serial"
-        }
-    },
-	"admin/rs485/mqtt": {
-		"title": "MQTT Settings",
-		"order": 2,
-		"action": {
-			"type": "view",
-			"path": "rs485/mqtt"
-    	}
-    },
-	"admin/rs485/protocol": {
-		"title": "Protocol Settings",
-		"order": 3,
-		"action": {
-            "type": "view",
-            "path": "rs485/protocol"
-        }
-    },
+		}
+	},
 	"admin/rs485/log": {
-		"title": "MQTT Log",
-		"order": 4,
+		"title": "Log",
+		"order": 2,
 		"action": {
 			"type": "view",
 			"path": "rs485/log"

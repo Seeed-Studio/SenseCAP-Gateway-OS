@@ -43,24 +43,28 @@ return view.extend({
         o.datatype = 'uinteger';
         o.placeholder = '8887';
 
-        o = s.taboption('general', form.Value, 'token', _('Authorization token'));
+        o = s.taboption('general', form.FileUpload, 'token', _('Authorization token'));
         o.optional = false;
         o.rmempty = false;
+        o.root_directory = '/etc/basicstation/token';
         o.depends({ mode: 'serverAndClientToken' });
 
-        o = s.taboption('general', form.Value, 'key', _('Private station key'));
+        o = s.taboption('general', form.FileUpload, 'key', _('Private station key'));
         o.optional = false;
         o.rmempty = false;
+        o.root_directory = '/etc/basicstation/certs/key';
         o.depends({ mode: 'serverAndClient' });
 
         o = s.taboption('general', form.FileUpload, 'crt', _('Private station certificate'));
         o.optional = false;
         o.rmempty = false;
+        o.root_directory = '/etc/basicstation/certs/client';
         o.depends({ mode: "serverAndClient" });
 
         o = s.taboption('general', form.FileUpload, 'trust', _('CA certificate'));
         o.optional = false;
         o.rmempty = false;
+        o.root_directory = '/etc/basicstation/certs/ca';
         o.depends({ mode: "no", "!reverse": true });
 
         // packet_filter tab
