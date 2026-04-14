@@ -55,13 +55,15 @@ return view.extend({
         o.root_directory = '/etc/basicstation/certs/key';
         o.depends({ mode: 'serverAndClient' });
 
-        o = s.taboption('general', form.FileUpload, 'crt', _('Private station certificate'));
+        o = s.taboption('general', form.FileUpload, 'crt', _('Private station certificate'),
+            _('Please upload a file in .cert.pem format'));
         o.optional = false;
         o.rmempty = false;
         o.root_directory = '/etc/basicstation/certs/client';
         o.depends({ mode: "serverAndClient" });
 
-        o = s.taboption('general', form.FileUpload, 'trust', _('CA certificate'));
+        o = s.taboption('general', form.FileUpload, 'trust', _('CA certificate'),
+            _('Please upload a file in cups.trust format'));
         o.optional = false;
         o.rmempty = false;
         o.root_directory = '/etc/basicstation/certs/ca';
