@@ -23,6 +23,10 @@
                 "/etc/basicstation/certs/ca/*": [
                     "list",
                     "read"
+                ],
+                "/etc/basicstation/token/*": [
+                    "list",
+                    "read"
                 ]
             },
             "ubus": {
@@ -60,6 +64,9 @@
                     "write"
                 ],
                 "/etc/basicstation/certs/ca/*": [
+                    "write"
+                ],
+                "/etc/basicstation/token/*": [
                     "write"
                 ]
             },

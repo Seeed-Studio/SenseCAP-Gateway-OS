@@ -43,9 +43,10 @@ return view.extend({
         o.datatype = 'uinteger';
         o.placeholder = '8887';
 
-        o = s.taboption('general', form.Value, 'token', _('Authorization token'));
+        o = s.taboption('general', form.FileUpload, 'token', _('Authorization token'));
         o.optional = false;
         o.rmempty = false;
+        o.root_directory = '/etc/basicstation/token';
         o.depends({ mode: 'serverAndClientToken' });
 
         o = s.taboption('general', form.FileUpload, 'key', _('Private station key'));
