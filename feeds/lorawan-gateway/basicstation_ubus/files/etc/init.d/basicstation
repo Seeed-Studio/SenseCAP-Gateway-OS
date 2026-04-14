@@ -212,7 +212,7 @@ parse_auth() {
 			[ -f "$buffer" ] && cp "$buffer" /tmp/basicstation/"$cred".crt
 		elif [ "$mode" = 'serverAndClientToken' ]; then
 			config_get buffer "$section" token
-			echo "$buffer" > /tmp/basicstation/"$cred".key
+			[ -f "$buffer" ] && cp "$buffer" /tmp/basicstation/"$cred".key
 		fi
 		if [ "$cred" = "tc" ]; then
 			uri="wss://${addr}:${port}"
