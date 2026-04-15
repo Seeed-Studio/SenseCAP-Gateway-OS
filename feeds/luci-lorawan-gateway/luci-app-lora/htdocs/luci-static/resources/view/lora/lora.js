@@ -68,7 +68,7 @@ function lorawanGatewayRender(platform_cur) {
 	};
 
 	// eui
-	o = loraSection.option(form.Value, 'eui', _('Gateway EUI'), ('Path to file containing the Gateway EUI in hex format (e.g. 00:11:22:33:44:55:66:77)'));
+	o = loraSection.option(form.Value, 'eui', _('Gateway EUI'), ('Enter Gateway EUI (16-digit hex, e.g. 0011223344556677). Found on device label.'));
 	o.optional = false;
 	o.rmempty = false;
 	o.placeholder = eui;
