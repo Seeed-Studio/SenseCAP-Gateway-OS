@@ -165,7 +165,7 @@ return view.extend({
         o.depends({ mode: 'serverAndClientToken' });
 
         o = s.taboption('general', CBISimpleFileUpload, 'key', _('Private station key'),
-            _('Please upload a file in .key.pem format'));
+            _('Please upload a file in .private.key format'));
         o.optional = false;
         o.rmempty = false;
         o.root_directory = '/etc/basicstation/certs/key';
