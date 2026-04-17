@@ -3,7 +3,8 @@ use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS, Transport};
 use rumqttc::tokio_rustls::rustls::ClientConfig as RustlsClientConfig;
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use serde::{Deserialize, Serialize};
-use std::fs::{File, OpenOptions};
+use serde_json::json;
+use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::process::Command;
 use std::sync::{Arc, Mutex as StdMutex};
@@ -56,10 +57,85 @@ struct BacnetConfig {
     poll_interval: u64,
 }
 
-// MQTT Message Structure
+// MQTT Message Structures
 #[derive(Debug, Serialize)]
 struct UplinkMessage {
-    data: String,
+    device: DeviceInfo,
+    data: BacnetData,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error_code: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct DeviceInfo {
+    sn: String,
+    mac: String,
+}
+
+#[derive(Debug, Serialize)]
+struct BacnetData {
+    protocol: String,
+    direction: String,
+    local_mac: u8,
+    local_instance: u32,
+    devices_discovered: usize,
+    devices: serde_json::Value,
+}
+
+/// Read device info from /etc/deviceinfo/ and /sys/class/net/eth0/address
+fn get_device_info() -> DeviceInfo {
+    let sn = fs::read_to_string("/etc/deviceinfo/sn")
+        .unwrap_or_default().trim().to_string();
+    let mac = fs::read_to_string("/sys/class/net/eth0/address")
+        .unwrap_or_default().trim().to_string();
+    DeviceInfo { sn, mac }
+}
+
+/// Build a structured MQTT uplink message for BACnet MS/TP
+fn build_bacnet_uplink(
+    config: &BacnetConfig,
+    devices_data: &str,
+    device_count: usize,
+    error: Option<String>,
+) -> String {
+    let devices: serde_json::Value = serde_json::from_str(devices_data)
+        .unwrap_or_else(|_| json!(devices_data));
+
+    let msg = UplinkMessage {
+        device: get_device_info(),
+        data: BacnetData {
+            protocol: "BACnet MS/TP".to_string(),
+            direction: "response".to_string(),
+            local_mac: config.mac_address,
+            local_instance: config.device_instance,
+            devices_discovered: device_count,
+            devices,
+        },
+        error_code: error,
+    };
+
+    serde_json::to_string(&msg).unwrap_or_else(|_| "{{\"error\":\"serialization failed\"}}".to_string())
+}
+
+/// Build a structured MQTT uplink error message for BACnet MS/TP
+fn build_bacnet_error_uplink(
+    config: &BacnetConfig,
+    error_msg: &str,
+) -> String {
+    let msg = UplinkMessage {
+        device: get_device_info(),
+        data: BacnetData {
+            protocol: "BACnet MS/TP".to_string(),
+            direction: "error".to_string(),
+            local_mac: config.mac_address,
+            local_instance: config.device_instance,
+            devices_discovered: 0,
+            devices: json!(null),
+        },
+        error_code: Some(error_msg.to_string()),
+    };
+
+    serde_json::to_string(&msg).unwrap_or_else(|_| "{{\"error\":\"serialization failed\"}}".to_string())
 }
 
 // Logger Structure
@@ -584,20 +660,22 @@ async fn main() {
 
                     // Publish to MQTT if connected
                     if let Some(ref client) = mqtt_client {
-                        let uplink_msg = UplinkMessage { data: data.clone() };
-                        if let Ok(json) = serde_json::to_string(&uplink_msg) {
-                            match client
-                                .publish(
-                                    &config.mqtt.uplink_topic,
-                                    config.mqtt.qos_level,
-                                    false,
-                                    json.as_bytes(),
-                                )
-                                .await
-                            {
-                                Ok(_) => logger.log(&format!("Published to MQTT: {}", config.mqtt.uplink_topic)),
-                                Err(e) => logger.log(&format!("MQTT publish failed: {}", e)),
-                            }
+                        let device_count = serde_json::from_str::<serde_json::Value>(&data)
+                            .ok()
+                            .and_then(|v| v.as_object().map(|o| o.len()))
+                            .unwrap_or(0);
+                        let json = build_bacnet_uplink(&config.bacnet, &data, device_count, None);
+                        match client
+                            .publish(
+                                &config.mqtt.uplink_topic,
+                                config.mqtt.qos_level,
+                                false,
+                                json.as_bytes(),
+                            )
+                            .await
+                        {
+                            Ok(_) => logger.log(&format!("Published to MQTT: {}", config.mqtt.uplink_topic)),
+                            Err(e) => logger.log(&format!("MQTT publish failed: {}", e)),
                         }
                     }
                 }
@@ -605,6 +683,17 @@ async fn main() {
                     let error_msg = "Error: No BACnet data collected";
                     let _ = std::fs::write(result_path, error_msg);
                     logger.log(error_msg);
+
+                    // Publish error to MQTT if connected
+                    if let Some(ref client) = mqtt_client {
+                        let json = build_bacnet_error_uplink(&config.bacnet, error_msg);
+                        let _ = client.publish(
+                            &config.mqtt.uplink_topic,
+                            config.mqtt.qos_level,
+                            false,
+                            json.as_bytes(),
+                        ).await;
+                    }
                 }
             }
         }
@@ -620,20 +709,22 @@ async fn main() {
 
                 // Publish to MQTT if connected
                 if let Some(ref client) = mqtt_client {
-                    let uplink_msg = UplinkMessage { data: data.clone() };
-                    if let Ok(json) = serde_json::to_string(&uplink_msg) {
-                        match client
-                            .publish(
-                                &config.mqtt.uplink_topic,
-                                config.mqtt.qos_level,
-                                false,
-                                json.as_bytes(),
-                            )
-                            .await
-                        {
-                            Ok(_) => logger.log(&format!("Published to MQTT: {}", config.mqtt.uplink_topic)),
-                            Err(e) => logger.log(&format!("MQTT publish failed: {}", e)),
-                        }
+                    let device_count = serde_json::from_str::<serde_json::Value>(&data)
+                        .ok()
+                        .and_then(|v| v.as_object().map(|o| o.len()))
+                        .unwrap_or(0);
+                    let json = build_bacnet_uplink(&config.bacnet, &data, device_count, None);
+                    match client
+                        .publish(
+                            &config.mqtt.uplink_topic,
+                            config.mqtt.qos_level,
+                            false,
+                            json.as_bytes(),
+                        )
+                        .await
+                    {
+                        Ok(_) => logger.log(&format!("Published to MQTT: {}", config.mqtt.uplink_topic)),
+                        Err(e) => logger.log(&format!("MQTT publish failed: {}", e)),
                     }
                 }
             }

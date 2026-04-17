@@ -3,7 +3,8 @@ use rumqttc::{AsyncClient, Event, Incoming, MqttOptions, QoS, Transport};
 use rumqttc::tokio_rustls::rustls::ClientConfig as RustlsClientConfig;
 use rustls_pemfile::{certs, pkcs8_private_keys};
 use serde::{Deserialize, Serialize};
-use std::fs::{File, OpenOptions};
+use serde_json::json;
+use std::fs::{self, File, OpenOptions};
 use std::io::Write;
 use std::process::Command;
 use std::sync::{Arc, Mutex as StdMutex};
@@ -78,12 +79,95 @@ struct ProtocolConfig {
 // MQTT Message Structures
 #[derive(Debug, Serialize)]
 struct UplinkMessage {
-    data: String,
+    device: DeviceInfo,
+    data: ModbusData,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error_code: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct DeviceInfo {
+    sn: String,
+    mac: String,
+}
+
+#[derive(Debug, Serialize)]
+struct ModbusData {
+    protocol: String,
+    direction: String,
+    slave_id: u8,
+    function_code: u8,
+    starting_address: u16,
+    quantity: u16,
+    values: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize)]
 struct DownlinkMessage {
     data: String,
+}
+
+/// Read device info from /etc/deviceinfo/ and /sys/class/net/eth0/address
+fn get_device_info() -> DeviceInfo {
+    let sn = fs::read_to_string("/etc/deviceinfo/sn")
+        .unwrap_or_default().trim().to_string();
+    let mac = fs::read_to_string("/sys/class/net/eth0/address")
+        .unwrap_or_default().trim().to_string();
+    DeviceInfo { sn, mac }
+}
+
+/// Build a structured MQTT uplink message for Modbus RTU response
+fn build_modbus_uplink(
+    config: &ProtocolConfig,
+    data_str: &str,
+    error: Option<String>,
+) -> String {
+    // Try to parse the data string as JSON values
+    let values: serde_json::Value = serde_json::from_str(data_str)
+        .unwrap_or_else(|_| json!(data_str));
+
+    let direction = match config.function_code {
+        1 | 2 | 3 | 4 => "response",
+        _ => "response",
+    };
+
+    let msg = UplinkMessage {
+        device: get_device_info(),
+        data: ModbusData {
+            protocol: "Modbus RTU".to_string(),
+            direction: direction.to_string(),
+            slave_id: config.device_address,
+            function_code: config.function_code,
+            starting_address: *config.register_addresses.first().unwrap_or(&0),
+            quantity: config.data_length,
+            values,
+        },
+        error_code: error,
+    };
+
+    serde_json::to_string(&msg).unwrap_or_else(|_| format!("{{\"error\":\"serialization failed\"}}"))
+}
+
+/// Build a structured MQTT uplink error message for Modbus RTU
+fn build_modbus_error_uplink(
+    config: &ProtocolConfig,
+    error_msg: &str,
+) -> String {
+    let msg = UplinkMessage {
+        device: get_device_info(),
+        data: ModbusData {
+            protocol: "Modbus RTU".to_string(),
+            direction: "error".to_string(),
+            slave_id: config.device_address,
+            function_code: config.function_code,
+            starting_address: *config.register_addresses.first().unwrap_or(&0),
+            quantity: config.data_length,
+            values: json!(null),
+        },
+        error_code: Some(error_msg.to_string()),
+    };
+
+    serde_json::to_string(&msg).unwrap_or_else(|_| format!("{{\"error\":\"serialization failed\"}}"))
 }
 
 // Logger Structure
@@ -916,12 +1000,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 // Publish to MQTT if enabled
                                 if config.mqtt.enabled {
                                     if let Some(ref client) = mqtt_client {
-                                        let uplink_msg = UplinkMessage { data: data.clone() };
-                                        if let Ok(json) = serde_json::to_string(&uplink_msg) {
-                                            match client.publish(&config.mqtt.uplink_topic, config.mqtt.qos_level, false, json.as_bytes()).await {
-                                                Ok(_) => logger.log(&format!("Published to MQTT: {}", json)),
-                                                Err(e) => logger.log(&format!("MQTT publish failed: {}", e)),
-                                            }
+                                        let json = build_modbus_uplink(&config.protocol, &data, None);
+                                        match client.publish(&config.mqtt.uplink_topic, config.mqtt.qos_level, false, json.as_bytes()).await {
+                                            Ok(_) => logger.log(&format!("Published to MQTT: {}", json)),
+                                            Err(e) => logger.log(&format!("MQTT publish failed: {}", e)),
                                         }
                                     }
                                 }
@@ -931,7 +1013,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 let error_msg = format!("Error: {}", e);
                                 match std::fs::write(result_path, &error_msg) {
                                     Ok(_) => logger.log("Error result written"),
-                                    Err(e) => logger.log(&format!("Failed to write error: {}", e)),
+                                    Err(e2) => logger.log(&format!("Failed to write error: {}", e2)),
+                                }
+                                // Publish error to MQTT
+                                if config.mqtt.enabled {
+                                    if let Some(ref client) = mqtt_client {
+                                        let json = build_modbus_error_uplink(&config.protocol, &error_msg);
+                                        let _ = client.publish(&config.mqtt.uplink_topic, config.mqtt.qos_level, false, json.as_bytes()).await;
+                                    }
                                 }
                             }
                             None => {
@@ -940,6 +1029,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 match std::fs::write(result_path, &error_msg) {
                                     Ok(_) => logger.log("Error result written"),
                                     Err(e) => logger.log(&format!("Failed to write error: {}", e)),
+                                }
+                                // Publish timeout error to MQTT
+                                if config.mqtt.enabled {
+                                    if let Some(ref client) = mqtt_client {
+                                        let json = build_modbus_error_uplink(&config.protocol, error_msg);
+                                        let _ = client.publish(&config.mqtt.uplink_topic, config.mqtt.qos_level, false, json.as_bytes()).await;
+                                    }
                                 }
                             }
                         }
@@ -975,12 +1071,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 // Publish to MQTT if enabled
                                 if config.mqtt.enabled {
                                     if let Some(ref client) = mqtt_client {
-                                        let uplink_msg = UplinkMessage { data: data.clone() };
-                                        if let Ok(json) = serde_json::to_string(&uplink_msg) {
-                                            match client.publish(&config.mqtt.uplink_topic, config.mqtt.qos_level, false, json.as_bytes()).await {
-                                                Ok(_) => logger.log(&format!("Published to MQTT: {}", json)),
-                                                Err(e) => logger.log(&format!("MQTT publish failed: {}", e)),
-                                            }
+                                        let json = build_modbus_uplink(&config.protocol, &data, None);
+                                        match client.publish(&config.mqtt.uplink_topic, config.mqtt.qos_level, false, json.as_bytes()).await {
+                                            Ok(_) => logger.log(&format!("Published to MQTT: {}", json)),
+                                            Err(e) => logger.log(&format!("MQTT publish failed: {}", e)),
                                         }
                                     }
                                 }
@@ -990,7 +1084,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 let error_msg = format!("Error: {}", e);
                                 match std::fs::write(result_path, &error_msg) {
                                     Ok(_) => logger.log("Error result written"),
-                                    Err(e) => logger.log(&format!("Failed to write error: {}", e)),
+                                    Err(e2) => logger.log(&format!("Failed to write error: {}", e2)),
+                                }
+                                // Publish error to MQTT
+                                if config.mqtt.enabled {
+                                    if let Some(ref client) = mqtt_client {
+                                        let json = build_modbus_error_uplink(&config.protocol, &error_msg);
+                                        let _ = client.publish(&config.mqtt.uplink_topic, config.mqtt.qos_level, false, json.as_bytes()).await;
+                                    }
                                 }
                             }
                             None => {
@@ -999,6 +1100,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                                 match std::fs::write(result_path, &error_msg) {
                                     Ok(_) => logger.log("Error result written"),
                                     Err(e) => logger.log(&format!("Failed to write error: {}", e)),
+                                }
+                                // Publish timeout error to MQTT
+                                if config.mqtt.enabled {
+                                    if let Some(ref client) = mqtt_client {
+                                        let json = build_modbus_error_uplink(&config.protocol, error_msg);
+                                        let _ = client.publish(&config.mqtt.uplink_topic, config.mqtt.qos_level, false, json.as_bytes()).await;
+                                    }
                                 }
                             }
                         }
