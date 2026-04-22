@@ -58,6 +58,10 @@ define Package/basicstation_ubus/install
 	$(INSTALL_BIN) ./files/etc/init.d/basicstation $(1)/etc/init.d/basicstation
 	$(INSTALL_DIR) $(1)/etc/basicstation
 	$(INSTALL_DATA) ./files/etc/basicstation/* $(1)/etc/basicstation/
+	$(INSTALL_DIR) $(1)/etc/basicstation/certs/key
+	$(INSTALL_DIR) $(1)/etc/basicstation/certs/client
+	$(INSTALL_DIR) $(1)/etc/basicstation/certs/ca
+	$(INSTALL_DIR) $(1)/etc/basicstation/token
 endef
 
 $(eval $(call BuildPackage,basicstation_ubus))
