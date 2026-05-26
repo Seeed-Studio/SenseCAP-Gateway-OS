@@ -60,11 +60,12 @@ struct BacnetConfig {
 
 const DEFAULT_BACNET_LOCAL_MAC: u8 = 10;
 const DEFAULT_BACNET_APDU_TIMEOUT_MS: u64 = 15000;
-const DEFAULT_BACNET_DISCOVERY_TIMEOUT_MS: u64 = 15000;
-const DEFAULT_BACNET_DISCOVERY_DELAY_MS: u64 = 3000;
-const BACNET_DEVICE_CACHE_TTL_SECS: u64 = 60;
+const DEFAULT_BACNET_DISCOVERY_TIMEOUT_MS: u64 = 5000;
+const DEFAULT_BACNET_DISCOVERY_DELAY_MS: u64 = 1000;
+const BACNET_DEVICE_CACHE_TTL_SECS: u64 = 10 * 60;
 const MIN_MQTT_KEEPALIVE_SECS: u64 = 120;
 const MQTT_PUBLISH_FLUSH_WINDOW_MS: u64 = 1000;
+const MQTT_MAX_SAFE_PAYLOAD_BYTES: usize = 9 * 1024;
 const DEVICE_OBJECT_TYPE: &str = "8";
 const PROP_OBJECT_NAME: &str = "77";
 
@@ -149,6 +150,96 @@ impl BacnetReadRequest {
     }
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+struct BacnetWriteRequest {
+    #[serde(default)]
+    target_device_instance: Option<u32>,
+    #[serde(default)]
+    object_type: Option<String>,
+    #[serde(default)]
+    object_instance: Option<u32>,
+    #[serde(default)]
+    property: Option<String>,
+    #[serde(default)]
+    priority: Option<u8>,
+    #[serde(default)]
+    array_index: Option<i32>,
+    #[serde(default)]
+    tag: Option<String>,
+    #[serde(default)]
+    value: Option<String>,
+}
+
+impl BacnetWriteRequest {
+    fn normalized(mut self) -> Self {
+        self.object_type = self.object_type.take().and_then(normalize_request_token);
+        self.property = self.property.take().and_then(normalize_request_token);
+        self.tag = self.tag.take().and_then(normalize_request_token);
+        self.value = self.value.take().and_then(normalize_request_token);
+        self
+    }
+
+    fn validate(&self) -> Result<(), String> {
+        if self.target_device_instance.is_none()
+            || self.object_type.is_none()
+            || self.object_instance.is_none()
+            || self.property.is_none()
+            || self.tag.is_none()
+            || self.value.is_none()
+        {
+            return Err(
+                "BACnet writes require target_device_instance, object_type, object_instance, property, tag, and value"
+                    .to_string(),
+            );
+        }
+
+        if let Some(priority) = self.priority {
+            if priority > 16 {
+                return Err("BACnet write priority must be between 0 and 16".to_string());
+            }
+        }
+
+        if let Some(array_index) = self.array_index {
+            if array_index < -1 {
+                return Err("BACnet write array_index must be -1 or greater".to_string());
+            }
+        }
+
+        let tag = self.tag.as_deref().unwrap_or_default();
+        if tag.parse::<u8>().map_or(true, |value| value > 14) {
+            return Err("BACnet write tag must be a BACnet application tag number from 0 to 14".to_string());
+        }
+
+        Ok(())
+    }
+
+    fn priority(&self) -> u8 {
+        self.priority.unwrap_or(16)
+    }
+
+    fn write_array_index(&self) -> i32 {
+        self.array_index.unwrap_or(-1)
+    }
+
+    fn read_array_index(&self) -> Option<u32> {
+        self.write_array_index().try_into().ok()
+    }
+
+    fn describe(&self) -> String {
+        format!(
+            "device={}, object_type={}, object_instance={}, property={}, priority={}, array_index={}, tag={}, value={}",
+            self.target_device_instance.unwrap_or_default(),
+            self.object_type.as_deref().unwrap_or(""),
+            self.object_instance.unwrap_or_default(),
+            self.property.as_deref().unwrap_or(""),
+            self.priority(),
+            self.write_array_index(),
+            self.tag.as_deref().unwrap_or(""),
+            self.value.as_deref().unwrap_or("")
+        )
+    }
+}
+
 fn normalize_request_token(value: String) -> Option<String> {
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -176,9 +267,12 @@ impl BacnetRuntimeState {
         Some(self.cached_devices.clone())
     }
 
-    fn clear_cached_devices(&mut self) {
-        self.cached_devices.clear();
-        self.cached_devices_at = None;
+    fn last_known_devices(&self) -> Option<Vec<u32>> {
+        if self.cached_devices.is_empty() {
+            None
+        } else {
+            Some(self.cached_devices.clone())
+        }
     }
 
     fn mark_summary_only(&mut self, device_instance: u32) {
@@ -376,6 +470,35 @@ fn load_trigger_read_request(
     Ok(Some(request))
 }
 
+fn load_trigger_write_request(
+    request_path: &str,
+    logger: &Logger,
+) -> Result<BacnetWriteRequest, String> {
+    if !Path::new(request_path).exists() {
+        return Err("missing BACnet write request".to_string());
+    }
+
+    let request_contents = fs::read_to_string(request_path)
+        .map_err(|e| format!("failed to read BACnet write request: {}", e))?;
+    let _ = fs::remove_file(request_path);
+
+    if request_contents.trim().is_empty() {
+        return Err("empty BACnet write request".to_string());
+    }
+
+    let request = serde_json::from_str::<BacnetWriteRequest>(&request_contents)
+        .map_err(|e| format!("invalid BACnet write request JSON: {}", e))?
+        .normalized();
+
+    request.validate()?;
+    logger.log(&format!(
+        "Received BACnet manual write request: {}",
+        request.describe()
+    ));
+
+    Ok(request)
+}
+
 async fn flush_mqtt_after_publish(
     mqtt_eventloop: Option<&mut rumqttc::EventLoop>,
     logger: &Logger,
@@ -436,6 +559,34 @@ async fn publish_mqtt_payload(
             false
         }
     }
+}
+
+fn limit_bacnet_mqtt_payload(
+    config: &BacnetConfig,
+    payload: String,
+    logger: &Logger,
+) -> String {
+    let payload_size = payload.as_bytes().len();
+    if payload_size <= MQTT_MAX_SAFE_PAYLOAD_BYTES {
+        return payload;
+    }
+
+    let error_msg = format!(
+        "BACnet MQTT payload too large: {} bytes exceeds safe limit {} bytes; full result kept locally only",
+        payload_size, MQTT_MAX_SAFE_PAYLOAD_BYTES
+    );
+    logger.log(&error_msg);
+    build_bacnet_error_uplink(config, &error_msg)
+}
+
+fn describe_bacnet_data_for_log(data: &str) -> String {
+    let size = data.as_bytes().len();
+    let device_count = serde_json::from_str::<serde_json::Value>(data)
+        .ok()
+        .and_then(|v| v.as_object().map(|o| o.len()))
+        .unwrap_or(0);
+
+    format!("{} bytes, {} device(s)", size, device_count)
 }
 
 // Logger Structure
@@ -780,7 +931,7 @@ async fn read_device_epics(config: &Config, device_instance: u32, logger: &Logge
         .arg(device_instance.to_string());
 
     let result = tokio::time::timeout(
-        Duration::from_secs(30),
+        Duration::from_secs(45),
         command.output(),
     )
     .await;
@@ -868,6 +1019,69 @@ async fn read_property(
     }
 }
 
+async fn write_property(
+    config: &Config,
+    request: &BacnetWriteRequest,
+    logger: &Logger,
+) -> Result<String, String> {
+    let device_instance = request.target_device_instance.unwrap_or_default();
+    let object_type = request.object_type.as_deref().unwrap_or_default();
+    let object_instance = request.object_instance.unwrap_or_default();
+    let property = request.property.as_deref().unwrap_or_default();
+    let tag = request.tag.as_deref().unwrap_or_default();
+    let value = request.value.as_deref().unwrap_or_default();
+
+    let mut command = TokioCommand::new("/usr/bin/bacwp");
+    configure_bacnet_command(&mut command, config)
+        .arg(device_instance.to_string())
+        .arg(object_type)
+        .arg(object_instance.to_string())
+        .arg(property)
+        .arg(request.priority().to_string())
+        .arg(request.write_array_index().to_string())
+        .arg(tag)
+        .arg(value);
+
+    let result = tokio::time::timeout(
+        Duration::from_secs(20),
+        command.output(),
+    )
+    .await;
+
+    match result {
+        Ok(Ok(output)) => {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = sanitize_bacnet_cli_output(&stdout);
+            let stderr = sanitize_bacnet_cli_output(&stderr);
+
+            if output.status.success() {
+                if stdout.is_empty() {
+                    Ok("OK".to_string())
+                } else {
+                    Ok(stdout)
+                }
+            } else {
+                let details = if stderr.is_empty() { stdout } else { stderr };
+                logger.log(&format!("bacwp error: {}", details));
+                Err(if details.is_empty() {
+                    "bacwp failed".to_string()
+                } else {
+                    details
+                })
+            }
+        }
+        Ok(Err(e)) => {
+            logger.log(&format!("bacwp execution failed: {}", e));
+            Err(format!("bacwp execution failed: {}", e))
+        }
+        Err(_) => {
+            logger.log("bacwp timed out");
+            Err("bacwp timed out".to_string())
+        }
+    }
+}
+
 async fn read_device_summary(
     config: &Config,
     device_instance: u32,
@@ -947,6 +1161,9 @@ async fn collect_requested_bacnet_data(
         match data {
             Some(value) => {
                 report.insert(device_id.to_string(), value);
+                if request.target_device_instance.is_some() {
+                    runtime_state.cache_devices(&[*device_id]);
+                }
             }
             None => {
                 logger.log(&format!("No requested data from device {}", device_id));
@@ -956,11 +1173,76 @@ async fn collect_requested_bacnet_data(
 
     if report.is_empty() {
         if used_cached_devices {
-            logger.log("Cached BACnet device list produced no targeted data. Clearing cache.");
-            runtime_state.clear_cached_devices();
+            logger.log("Cached BACnet device list produced no targeted data. Keeping cache for discovery fallback.");
         }
         return None;
     }
+
+    match serde_json::to_string(&report) {
+        Ok(json) => Some(json),
+        Err(e) => {
+            logger.log(&format!("JSON serialization failed: {}", e));
+            None
+        }
+    }
+}
+
+async fn collect_requested_bacnet_write(
+    config: &Config,
+    logger: &Logger,
+    runtime_state: &mut BacnetRuntimeState,
+    request: &BacnetWriteRequest,
+) -> Option<String> {
+    let device_instance = request.target_device_instance.unwrap_or_default();
+    logger.log(&format!(
+        "Running BACnet write for remote device {}",
+        device_instance
+    ));
+
+    let write_output = match write_property(config, request, logger).await {
+        Ok(output) => output,
+        Err(e) => {
+            logger.log(&format!("BACnet write failed for device {}: {}", device_instance, e));
+            return None;
+        }
+    };
+
+    runtime_state.cache_devices(&[device_instance]);
+
+    let readback_value = read_property(
+        config,
+        device_instance,
+        request.object_type.as_deref().unwrap_or_default(),
+        request.object_instance.unwrap_or_default(),
+        request.property.as_deref().unwrap_or_default(),
+        request.read_array_index(),
+        logger,
+    )
+    .await;
+
+    if readback_value.is_none() {
+        logger.log(&format!(
+            "BACnet write succeeded for device {}, but readback failed",
+            device_instance
+        ));
+    }
+
+    let mut report = serde_json::Map::new();
+    report.insert(
+        device_instance.to_string(),
+        serde_json::json!({
+            "operation": "write",
+            "object_type": request.object_type.as_deref().unwrap_or_default(),
+            "object_instance": request.object_instance.unwrap_or_default(),
+            "property": request.property.as_deref().unwrap_or_default(),
+            "priority": request.priority(),
+            "array_index": request.write_array_index(),
+            "tag": request.tag.as_deref().unwrap_or_default(),
+            "value": request.value.as_deref().unwrap_or_default(),
+            "write_output": write_output,
+            "readback_value": readback_value,
+        }),
+    );
 
     match serde_json::to_string(&report) {
         Ok(json) => Some(json),
@@ -987,9 +1269,18 @@ async fn get_target_devices(
     let devices = discover_devices(config, logger).await;
     if !devices.is_empty() {
         runtime_state.cache_devices(&devices);
+        return (devices, false);
     }
 
-    (devices, false)
+    if let Some(last_known_devices) = runtime_state.last_known_devices() {
+        logger.log(&format!(
+            "Discovery returned no devices. Falling back to last known BACnet device list: {:?}",
+            last_known_devices
+        ));
+        return (last_known_devices, true);
+    }
+
+    (Vec::new(), false)
 }
 
 /// Collect BACnet data from all discovered devices and build a JSON report.
@@ -1031,6 +1322,15 @@ async fn collect_bacnet_data(
 
         match read_device_epics(config, *device_id, logger).await {
             Some(data) => {
+                if data.as_bytes().len() > MQTT_MAX_SAFE_PAYLOAD_BYTES {
+                    runtime_state.mark_summary_only(*device_id);
+                    logger.log(&format!(
+                        "bacepics data for device {} is {} bytes. Future periodic polls will use summary reads.",
+                        device_id,
+                        data.as_bytes().len()
+                    ));
+                }
+
                 report.insert(
                     device_id.to_string(),
                     serde_json::Value::String(data),
@@ -1060,8 +1360,7 @@ async fn collect_bacnet_data(
 
     if report.is_empty() {
         if used_cached_devices {
-            logger.log("Cached BACnet device list produced no data. Clearing cache.");
-            runtime_state.clear_cached_devices();
+            logger.log("Cached BACnet device list produced no data. Keeping cache for discovery fallback.");
         }
         return None;
     }
@@ -1127,20 +1426,121 @@ async fn main() {
         }
     }
 
-    let mut last_poll = tokio::time::Instant::now()
-        - Duration::from_secs(config.bacnet.poll_interval);
+    let mut last_poll = tokio::time::Instant::now();
     let mut bacnet_runtime_state = BacnetRuntimeState::default();
     let trigger_read_owned = format!("/tmp/rs485/bacnet_read_{}", port_num);
+    let trigger_write_owned = format!("/tmp/rs485/bacnet_write_{}", port_num);
     let request_owned = format!("/tmp/rs485/bacnet_request_{}", port_num);
+    let write_request_owned = format!("/tmp/rs485/bacnet_write_request_{}", port_num);
     let result_owned = format!("/tmp/rs485/bacnet_result_{}", port_num);
     let periodic_result_owned = format!("/tmp/rs485/bacnet_last_result_{}", port_num);
     let trigger_read_path = trigger_read_owned.as_str();
+    let trigger_write_path = trigger_write_owned.as_str();
     let request_path = request_owned.as_str();
+    let write_request_path = write_request_owned.as_str();
     let result_path = result_owned.as_str();
     let periodic_result_path = periodic_result_owned.as_str();
 
     // Main event loop
     loop {
+        // Handle trigger-file based writes (for LuCI UI)
+        if Path::new(trigger_write_path).exists() {
+            logger.log("BACnet write trigger detected");
+            let _ = std::fs::remove_file(trigger_write_path);
+            last_poll = tokio::time::Instant::now();
+
+            let write_request = match load_trigger_write_request(write_request_path, &logger) {
+                Ok(request) => request,
+                Err(e) => {
+                    let error_msg = format!("Error: {}", e);
+                    let _ = std::fs::write(result_path, &error_msg);
+                    logger.log(&error_msg);
+
+                    if let Some(ref client) = mqtt_client {
+                        let json = build_bacnet_error_uplink(&config.bacnet, &error_msg);
+                        if !publish_mqtt_payload(
+                            client,
+                            mqtt_eventloop.as_mut(),
+                            &config.mqtt.uplink_topic,
+                            config.mqtt.qos_level,
+                            &json,
+                            &logger,
+                        )
+                        .await
+                        {
+                            mqtt_state = "failed_connect";
+                        }
+                    }
+
+                    continue;
+                }
+            };
+
+            match collect_requested_bacnet_write(
+                &config,
+                &logger,
+                &mut bacnet_runtime_state,
+                &write_request,
+            )
+            .await
+            {
+                Some(data) => {
+                    logger.log(&format!(
+                        "BACnet write completed: {}",
+                        describe_bacnet_data_for_log(&data)
+                    ));
+                    if let Err(e) = std::fs::write(result_path, &data) {
+                        logger.log(&format!("Failed to write result: {}", e));
+                    }
+
+                    if let Some(ref client) = mqtt_client {
+                        let device_count = serde_json::from_str::<serde_json::Value>(&data)
+                            .ok()
+                            .and_then(|v| v.as_object().map(|o| o.len()))
+                            .unwrap_or(0);
+                        let json = limit_bacnet_mqtt_payload(
+                            &config.bacnet,
+                            build_bacnet_uplink(&config.bacnet, &data, device_count, None),
+                            &logger,
+                        );
+                        if !publish_mqtt_payload(
+                            client,
+                            mqtt_eventloop.as_mut(),
+                            &config.mqtt.uplink_topic,
+                            config.mqtt.qos_level,
+                            &json,
+                            &logger,
+                        )
+                        .await
+                        {
+                            mqtt_state = "failed_connect";
+                        }
+                    }
+                }
+                None => {
+                    let error_msg = "Error: BACnet write failed";
+                    let _ = std::fs::write(result_path, error_msg);
+                    logger.log(error_msg);
+
+                    if let Some(ref client) = mqtt_client {
+                        let json = build_bacnet_error_uplink(&config.bacnet, error_msg);
+                        if !publish_mqtt_payload(
+                            client,
+                            mqtt_eventloop.as_mut(),
+                            &config.mqtt.uplink_topic,
+                            config.mqtt.qos_level,
+                            &json,
+                            &logger,
+                        )
+                        .await
+                        {
+                            mqtt_state = "failed_connect";
+                        }
+                    }
+                }
+            }
+        }
+
         // Handle trigger-file based reads (for LuCI UI)
         if Path::new(trigger_read_path).exists() {
             logger.log("BACnet read trigger detected");
@@ -1183,7 +1583,10 @@ async fn main() {
 
             match read_result {
                 Some(data) => {
-                    logger.log(&format!("BACnet data collected: {}", data));
+                    logger.log(&format!(
+                        "BACnet data collected: {}",
+                        describe_bacnet_data_for_log(&data)
+                    ));
                     if let Err(e) = std::fs::write(result_path, &data) {
                         logger.log(&format!("Failed to write result: {}", e));
                     }
@@ -1194,7 +1597,11 @@ async fn main() {
                             .ok()
                             .and_then(|v| v.as_object().map(|o| o.len()))
                             .unwrap_or(0);
-                        let json = build_bacnet_uplink(&config.bacnet, &data, device_count, None);
+                        let json = limit_bacnet_mqtt_payload(
+                            &config.bacnet,
+                            build_bacnet_uplink(&config.bacnet, &data, device_count, None),
+                            &logger,
+                        );
                         if !publish_mqtt_payload(
                             client,
                             mqtt_eventloop.as_mut(),
@@ -1249,7 +1656,11 @@ async fn main() {
                         .ok()
                         .and_then(|v| v.as_object().map(|o| o.len()))
                         .unwrap_or(0);
-                    let json = build_bacnet_uplink(&config.bacnet, &data, device_count, None);
+                    let json = limit_bacnet_mqtt_payload(
+                        &config.bacnet,
+                        build_bacnet_uplink(&config.bacnet, &data, device_count, None),
+                        &logger,
+                    );
                     if !publish_mqtt_payload(
                         client,
                         mqtt_eventloop.as_mut(),
