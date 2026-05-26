@@ -91,14 +91,16 @@ struct DownlinkMessage {
 // Logger Structure
 struct Logger {
     file: StdMutex<Option<File>>,
+    port_num: u8,
 }
 
 // Logger Implementation
 impl Logger {
     // Create a new Logger instance
-    fn new() -> Self {
+    fn new(port_num: u8) -> Self {
         Logger {
             file: StdMutex::new(None),
+            port_num,
         }
     }
 
@@ -123,7 +125,7 @@ impl Logger {
         // Get current timestamp
         let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
         // Format log line
-        let log_line = format!("[{}][RS485-MQTT]: {}\n", timestamp, message);
+        let log_line = format!("[{}][RS485-MQTT-CH{}]: {}\n", timestamp, self.port_num, message);
         print!("{}", log_line);
 
         // Write log line to file if initialized
@@ -136,8 +138,8 @@ impl Logger {
     }
 }
 
-// Load configuration from UCI
-fn load_config_from_uci() -> Result<Config, Box<dyn std::error::Error + Send + Sync>> {
+// Load configuration from UCI for a specific port
+fn load_config_from_uci(port_num: u8) -> Result<Config, Box<dyn std::error::Error + Send + Sync>> {
     // uci get helper function
     let uci_get = |config: &str, section: &str, option: &str| -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let output = Command::new("uci")
@@ -150,41 +152,42 @@ fn load_config_from_uci() -> Result<Config, Box<dyn std::error::Error + Send + S
         }
     };
 
-    // MQTT config
-    let enabled = uci_get("rs485-module", "mqtt", "enabled")
+    let sid = format!("port{}", port_num);
+
+    // MQTT config — read from portN section with mqtt_ prefix
+    let enabled = uci_get("rs485-module", &sid, "mqtt_host")
         .ok()
-        .and_then(|s| s.parse::<u8>().ok())
-        .unwrap_or(0)
-        == 1;   
-    let host = uci_get("rs485-module", "mqtt", "host").unwrap_or_default();
-    let port = uci_get("rs485-module", "mqtt", "port")
+        .map(|s| !s.is_empty())
+        .unwrap_or(false);
+    let host = uci_get("rs485-module", &sid, "mqtt_host").unwrap_or_default();
+    let port = uci_get("rs485-module", &sid, "mqtt_port")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(1883);
-    let username = uci_get("rs485-module", "mqtt", "username").ok();
-    let password = uci_get("rs485-module", "mqtt", "password").ok();
-    let client_id = uci_get("rs485-module", "mqtt", "client_id").unwrap_or_else(|_| "rs485_bridge".to_string());
-    let keepalive = uci_get("rs485-module", "mqtt", "keepalive")
+    let username = uci_get("rs485-module", &sid, "mqtt_username").ok();
+    let password = uci_get("rs485-module", &sid, "mqtt_password").ok();
+    let client_id = uci_get("rs485-module", &sid, "mqtt_client_id").unwrap_or_else(|_| format!("rs485_bridge_{}", port_num));
+    let keepalive = uci_get("rs485-module", &sid, "mqtt_keepalive")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(30);
-    let uplink_topic = uci_get("rs485-module", "mqtt", "uplink_topic").unwrap_or_else(|_| "rs485/uplink".to_string());
-    let downlink_topic = uci_get("rs485-module", "mqtt", "downlink_topic").unwrap_or_else(|_| "rs485/downlink".to_string());
-    let qos_level = uci_get("rs485-module", "mqtt", "qos")
+    let uplink_topic = uci_get("rs485-module", &sid, "mqtt_uplink_topic").unwrap_or_else(|_| format!("rs485/CH{}/uplink", port_num));
+    let downlink_topic = uci_get("rs485-module", &sid, "mqtt_downlink_topic").unwrap_or_else(|_| format!("rs485/CH{}/downlink", port_num));
+    let qos_level = uci_get("rs485-module", &sid, "mqtt_qos")
         .ok()
         .and_then(|s| s.parse::<u8>().ok())
         .unwrap_or(0);
-    let reconnect_delay = uci_get("rs485-module", "mqtt", "reconnect_delay")
+    let reconnect_delay = uci_get("rs485-module", &sid, "mqtt_reconnect_delay")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(30);
 
-    let transport = uci_get("rs485-module", "mqtt", "transport").unwrap_or_else(|_| "tcp".to_string());
-    let auth_mode = uci_get("rs485-module", "mqtt", "auth_mode").unwrap_or_else(|_| "none".to_string());
-    let ca_cert = uci_get("rs485-module", "mqtt", "ca_cert").ok();
-    let client_cert = uci_get("rs485-module", "mqtt", "client_cert").ok();
-    let client_key = uci_get("rs485-module", "mqtt", "client_key").ok();
-    let token = uci_get("rs485-module", "mqtt", "token").ok();
+    let transport = uci_get("rs485-module", &sid, "mqtt_transport").unwrap_or_else(|_| "tcp".to_string());
+    let auth_mode = uci_get("rs485-module", &sid, "mqtt_auth_mode").unwrap_or_else(|_| "none".to_string());
+    let ca_cert = uci_get("rs485-module", &sid, "mqtt_ca_cert").ok();
+    let client_cert = uci_get("rs485-module", &sid, "mqtt_client_cert").ok();
+    let client_key = uci_get("rs485-module", &sid, "mqtt_client_key").ok();
+    let token = uci_get("rs485-module", &sid, "mqtt_token").ok();
 
     let mqtt_config = MqttConfig {
         enabled,
@@ -200,7 +203,7 @@ fn load_config_from_uci() -> Result<Config, Box<dyn std::error::Error + Send + S
         qos_level: match qos_level {
             1 => QoS::AtLeastOnce,
             2 => QoS::ExactlyOnce,
-            _ => QoS::AtMostOnce, 
+            _ => QoS::AtMostOnce,
         },
         reconnect_delay,
         auth_mode,
@@ -210,23 +213,20 @@ fn load_config_from_uci() -> Result<Config, Box<dyn std::error::Error + Send + S
         token,
     };
 
-    // Serial config
-    let device = format!(
-        "/dev/{}",
-        uci_get("rs485-module", "serial", "device").unwrap_or_else(|_| "RS485-1".to_string())
-    );
-    let baudrate = uci_get("rs485-module", "serial", "baudrate")
+    // Serial config — read from portN section, device derived from port number
+    let device = format!("/dev/RS485-{}", port_num);
+    let baudrate = uci_get("rs485-module", &sid, "baudrate")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(9600);
-    let databit = uci_get("rs485-module", "serial", "databit")
+    let databit = uci_get("rs485-module", &sid, "databit")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(8);
-    let stopbit = uci_get("rs485-module", "serial", "stopbit").unwrap_or_else(|_| "1".to_string());
-    let checkbit = uci_get("rs485-module", "serial", "checkbit").unwrap_or_else(|_| "none".to_string());
-    let flowcontrol = uci_get("rs485-module", "serial", "flowcontrol").unwrap_or_else(|_| "none".to_string());
-    let timeout = uci_get("rs485-module", "serial", "timeout")
+    let stopbit = uci_get("rs485-module", &sid, "stopbit").unwrap_or_else(|_| "1".to_string());
+    let checkbit = uci_get("rs485-module", &sid, "checkbit").unwrap_or_else(|_| "none".to_string());
+    let flowcontrol = uci_get("rs485-module", &sid, "flowcontrol").unwrap_or_else(|_| "none".to_string());
+    let timeout = uci_get("rs485-module", &sid, "timeout")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(1000);
@@ -463,13 +463,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Initialize timezone from UCI system configuration
     init_timezone();
 
+    // Parse port number from command line (default: 1)
+    let port_num: u8 = std::env::args()
+        .nth(1)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1);
+
     // Initialize logger
-    let logger = Arc::new(Logger::new());
+    let logger = Arc::new(Logger::new(port_num));
     logger.init()?;
-    logger.log("RS485-MQTT Bridge starting...");
+    logger.log(&format!("RS485-MQTT Bridge starting for port {}...", port_num));
 
     // Load initial configuration from UCI
-    let mut config = match load_config_from_uci() {
+    let mut config = match load_config_from_uci(port_num) {
         Ok(cfg) => cfg,
         Err(e) => {
             logger.log(&format!("Failed to setup config: {}", e));
@@ -499,7 +505,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     loop {
             // Load configuration
-            config = match load_config_from_uci() {
+            config = match load_config_from_uci(port_num) {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     logger.log(&format!("Failed to load config: {}", e));
@@ -596,15 +602,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             }
                         }
 
-                        serial_result = async { 
-                            let mut serial_buffer = vec![0u8; 1024];
-                            serial_port.read(&mut serial_buffer).await.map(|n| (n, serial_buffer))
+                        serial_result = async {
+                            let mut buf = vec![0u8; 4096];
+                            match serial_port.read(&mut buf).await {
+                                Ok(n) if n > 0 => {
+                                    let mut total = n;
+                                    loop {
+                                        match tokio::time::timeout(
+                                            Duration::from_millis(50),
+                                            serial_port.read(&mut buf[total..])
+                                        ).await {
+                                            Ok(Ok(m)) if m > 0 => {
+                                                total += m;
+                                                if total >= buf.len() { break; }
+                                            }
+                                            _ => break,
+                                        }
+                                    }
+                                    Ok((total, buf))
+                                }
+                                Ok(_) => Err(std::io::Error::new(std::io::ErrorKind::WouldBlock, "no data")),
+                                Err(e) => Err(e),
+                            }
                         } => {
                             match serial_result {
                                 Ok((n, buffer)) if n > 0 => {
                                     let data_str = String::from_utf8_lossy(&buffer[..n]).trim().to_string();
-                                    logger.log(&format!("RS485 received: {}", data_str));
-                                    
+                                    logger.log(&format!("RS485 received ({} bytes): {}", n, data_str));
+
                                     if let Some(ref client) = mqtt_client {
                                         let uplink_msg = UplinkMessage { data: data_str.clone() };
                                         match serde_json::to_string(&uplink_msg) {
