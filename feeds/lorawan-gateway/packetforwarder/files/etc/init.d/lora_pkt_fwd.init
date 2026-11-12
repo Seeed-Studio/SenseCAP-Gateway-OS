@@ -102,7 +102,8 @@ parse_chirpstack_gateway() {
 	json_add_object 'gateway_conf'
 	config_get val "$section" gateway_ID 'AA555A0000000000'
 	json_add_string 'gateway_ID' "$val"
-	json_add_string 'server_address' "localhost"
+	config_get val "$section" server_address 'localhost'
+	json_add_string 'server_address' "$val"
 	json_add_int 'serv_port_up' "1700"
 	json_add_int 'serv_port_down' "1700"
 	json_add_int 'keepalive_interval' "5"

@@ -1,0 +1,50 @@
+#!/bin/sh
+# Align packetforwarder/basicstation region with hardware EEPROM on existing units.
+# Tight match: only rewrite when config carries the factory-default US915 signature
+# and hardware says otherwise, so deliberate user changes are preserved.
+
+HW=$(cat /etc/deviceinfo/freq_plan 2>/dev/null)
+case "$HW" in US915|EU868|CN470) ;; *) exit 0 ;; esac
+
+EUI=$(cat /etc/deviceinfo/eui 2>/dev/null)
+
+plan_for() {
+	case "$1" in
+		"EU868") echo 'EU_863_870_TTN' ;;
+		"CN470") echo 'CN_470_510_FSB_2' ;;
+		*)       echo 'US_902_928_FSB_2' ;;
+	esac
+}
+
+if [ -e /etc/config/packetforwarder ]; then
+	CHANGED=0
+	CUR=$(uci -q get packetforwarder.sx130x.region)
+	PLAN=$(uci -q get packetforwarder.sx130x.channel_plan)
+	if [ "$CUR" != "$HW" ]; then
+		# Only migrate the factory-default signature; otherwise respect the user.
+		if [ "$CUR" = "US915" ] && [ "$PLAN" = "US_902_928_FSB_2" ]; then
+			logger -t region_migrate "packetforwarder region '$CUR' -> '$HW' (factory default mismatch)"
+			uci set packetforwarder.sx130x.region="$HW"
+			uci set packetforwarder.sx130x.channel_plan="$(plan_for "$HW")"
+			CHANGED=1
+		fi
+	fi
+	GID=$(uci -q get packetforwarder.gateway.gateway_ID)
+	if [ "$GID" = "AA555A0000000000" ] && [ -n "$EUI" ]; then
+		logger -t region_migrate "gateway_ID sample -> EUI $EUI"
+		uci set packetforwarder.gateway.gateway_ID="$EUI"
+		CHANGED=1
+	fi
+	[ "$CHANGED" = 1 ] && uci commit packetforwarder
+fi
+
+if [ -e /etc/config/basicstation ]; then
+	CUR=$(uci -q get basicstation.sx130x.region)
+	if [ -n "$CUR" ] && [ "$CUR" != "$HW" ] && [ "$CUR" = "US915" ]; then
+		logger -t region_migrate "basicstation region 'US915' -> '$HW'"
+		uci set basicstation.sx130x.region="$HW"
+		uci commit basicstation
+	fi
+fi
+
+exit 0
