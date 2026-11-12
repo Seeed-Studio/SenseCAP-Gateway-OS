@@ -271,7 +271,7 @@ local my_method = {
                                 conn:reply(req, {result=0})
                                 uloop.timer(function()
                                         print("Rebooting host...")
-                                        os.execute("echo b > /proc/sysrq-trigger")
+                                        os.execute("sync && echo s > /proc/sysrq-trigger && echo b > /proc/sysrq-trigger")
                                 end, 2000)
                         end, {}
                 },
@@ -280,7 +280,7 @@ local my_method = {
                                 conn:reply(req, {result=0})
                                 uloop.timer(function()
                                         print("Shutting down host...")
-                                        os.execute("echo o > /proc/sysrq-trigger")
+                                        os.execute("sync && echo o > /proc/sysrq-trigger")
                                 end, 2000)
                         end, {}
                 }
