@@ -46,34 +46,9 @@ uci set network.wwan.metric='30'
 uci commit network
 
 # Set firewall rules
-uci add firewall rule
-uci set firewall.@rule[-1].name='Allow-WAN-HTTP'
-uci set firewall.@rule[-1].src='wan'
-uci set firewall.@rule[-1].proto='tcp'
-uci set firewall.@rule[-1].dest_port='80'
-uci set firewall.@rule[-1].target='ACCEPT'
-uci set firewall.@rule[-1].family='ipv4'
-uci add firewall rule
-uci set firewall.@rule[-1].name='Allow-ssh-WAN'
-uci set firewall.@rule[-1].src='wan'
-uci set firewall.@rule[-1].proto='tcp'
-uci set firewall.@rule[-1].dest_port='22'
-uci set firewall.@rule[-1].target='ACCEPT'
-uci set firewall.@rule[-1].family='ipv4'
-uci add firewall rule
-uci set firewall.@rule[-1].name='Allow-WAN-CHIRPSTACK'
-uci set firewall.@rule[-1].src='wan'
-uci set firewall.@rule[-1].proto='tcp'
-uci set firewall.@rule[-1].dest_port='8080'
-uci set firewall.@rule[-1].target='ACCEPT'
-uci set firewall.@rule[-1].family='ipv4'
-uci add firewall rule
-uci set firewall.@rule[-1].name='Allow-WAN-TTY'
-uci set firewall.@rule[-1].src='wan'
-uci set firewall.@rule[-1].proto='tcp'
-uci set firewall.@rule[-1].dest_port='7681'
-uci set firewall.@rule[-1].target='ACCEPT'
-uci set firewall.@rule[-1].family='ipv4'
+# Management services (LuCI/SSH/ChirpStack/ttyd) are NOT opened from WAN by
+# default; see 78_fw_migrate which removes them from upgraded units and the
+# README for the documented opt-in.
 uci add firewall rule
 uci set firewall.@rule[-1].name='Allow-lora'
 uci set firewall.@rule[-1].src='wan'
