@@ -253,6 +253,19 @@ uci commit firewall && /etc/init.d/firewall restart
 Replace `dest_port` (and the name) for SSH/ChirpStack/ttyd as needed, and
 remove the rule when finished.
 
+### LXC isolation model
+
+SenseCAP runs as a **privileged, unconfined** LXC container. The host kernel
+currently has no AppArmor confinement, and `/sys` is mounted read-write.
+The container shares the host kernel; its `kmod-*` packages are therefore
+placeholders, not separately installed kernel modules.
+
+Treat SenseCAP and any additional containers as part of the same host trust
+domain, not as a security sandbox. Use a VM or a separately hardened host if
+untrusted workloads must be isolated. Changes to the host LXC configuration,
+`/usr/local/bin`, and `/boot/firmware/cmdline.txt` require rebuilding or
+reflashing the host image; they are not applied by a container OTA.
+
 ## Function Modules
 
 ### LoRaWAN Gateway
