@@ -266,6 +266,12 @@ untrusted workloads must be isolated. Changes to the host LXC configuration,
 `/usr/local/bin`, and `/boot/firmware/cmdline.txt` require rebuilding or
 reflashing the host image; they are not applied by a container OTA.
 
+To enable memory limits for additional LXC containers, edit
+`/boot/firmware/cmdline.txt` on the host, replace `cgroup_disable=memory`
+with `cgroup_enable=memory`, and reboot. Then set the container's
+`lxc.cgroup.memory.limit_in_bytes` as needed. Check availability with
+`lxc-cgroup -n SenseCAP memory.limit_in_bytes`.
+
 ## Function Modules
 
 ### LoRaWAN Gateway
