@@ -83,10 +83,17 @@ uci set wireless.radio0.disabled='0'
 uci set wireless.radio0.band='2g'
 uci set wireless.radio0.channel='auto'
 uci set wireless.radio0.htmode='HT20'
-uci set wireless.radio0.country='CN'
+# country: kept if already configured, else defaulted from EEPROM freq plan
 uci set wireless.default_radio0.mode='sta'
 uci set wireless.default_radio0.network='wwan'
 ```
+
+### Wi-Fi Country
+
+The country is never overwritten once configured. When
+`wireless.radio0.country` is unset, STA setup defaults it from
+`/etc/deviceinfo/freq_plan` (US915 -> US, EU868 -> FR, CN470 -> CN).
+Changes made in LuCI always win.
 
 ### Configuration Parameters
 
