@@ -55,6 +55,17 @@ uci set wireless.radio0.band='2g'
 uci set wireless.radio0.channel='6'
 uci -q delete wireless.radio0.htmode
 
+# Default country follows the EEPROM freq plan. First boot only: the
+# MARKER guard above prevents re-runs, so anything the user configures
+# via LuCI (persisted in /etc/config/wireless) always wins.
+case "$(cat /etc/deviceinfo/freq_plan 2>/dev/null)" in
+    US915) country="US" ;;
+    EU868) country="FR" ;;
+    CN470) country="CN" ;;
+    *)     country="" ;;
+esac
+[ -n "$country" ] && uci set wireless.radio0.country="$country"
+
 uci -q delete wireless.default_radio0
 uci -q delete wireless.wifinet0
 
