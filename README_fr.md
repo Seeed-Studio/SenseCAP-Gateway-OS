@@ -129,7 +129,7 @@ git submodule update --init --recursive
 #### 2. Cloner le source OpenWrt
 
 ```bash
-git clone https://github.com/openwrt/openwrt.git -b openwrt-24.10
+git clone https://github.com/openwrt/openwrt.git -b openwrt-25.12
 cd openwrt
 rm -r feeds.conf.default
 cp ../feeds.conf.default feeds.conf.default

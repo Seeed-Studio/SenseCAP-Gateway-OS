@@ -130,7 +130,7 @@ git submodule update --init --recursive
 #### 2. 克隆 OpenWrt 源码
 
 ```bash
-git clone https://github.com/openwrt/openwrt.git -b openwrt-24.10
+git clone https://github.com/openwrt/openwrt.git -b openwrt-25.12
 cd openwrt
 rm -r feeds.conf.default
 cp ../feeds.conf.default feeds.conf.default
