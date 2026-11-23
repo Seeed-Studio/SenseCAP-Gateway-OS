@@ -56,15 +56,15 @@ index 46484be..16ba249 100644
 +        MSG("INFO: whitelist is disabled\n");
 +    }
 +    
-+    val = json_object_get_string(conf_obj, "whitelist_devaddr_min");
-+    if (val != NULL) {
-+        whitelist_devaddr_min = (uint32_t) strtoll(val, NULL, 16);
++    str = json_object_get_string(conf_obj, "whitelist_devaddr_min");
++    if (str != NULL) {
++        whitelist_devaddr_min = (uint32_t) strtoll(str, NULL, 16);
 +        MSG("INFO: whitelist_devaddr_min set to 0x%x\n", whitelist_devaddr_min);
 +    }
 +
-+    val = json_object_get_string(conf_obj, "whitelist_devaddr_max");
-+    if (val != NULL) {
-+        whitelist_devaddr_max = (uint32_t) strtoll(val, NULL, 16);
++    str = json_object_get_string(conf_obj, "whitelist_devaddr_max");
++    if (str != NULL) {
++        whitelist_devaddr_max = (uint32_t) strtoll(str, NULL, 16);
 +        MSG("INFO: whitelist_devaddr_max set to 0x%x\n", whitelist_devaddr_max);
 +    }
 +

@@ -130,7 +130,15 @@ diff --git a/src/lora.c b/src/lora.c
 index 4d63baa..5501841 100644
 --- a/src/lora.c
 +++ b/src/lora.c
-@@ -82,6 +82,28 @@
+@@ -29,6 +29,7 @@
+  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
++#include <stdio.h>
+ #include "s2conf.h"
+ #include "uj.h"
+ 
+@@ -82,6 +83,28 @@
  uL_t* s2e_joineuiFilter;
  u4_t  s2e_netidFilter[4] = { 0xffFFffFF, 0xffFFffFF, 0xffFFffFF, 0xffFFffFF };
  
