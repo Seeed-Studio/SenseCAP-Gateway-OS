@@ -43,7 +43,7 @@ return view.extend({
 		body.appendChild(E('button', {
 			'class': 'cbi-button cbi-button-action important',
 			'click': ui.createHandlerFn(this, 'handleReboot')
-		}, _('Perform openwrt reboot')));
+		}, _('Perform reboot')));
 
 		body.appendChild(E('span', {}, ' '));
 

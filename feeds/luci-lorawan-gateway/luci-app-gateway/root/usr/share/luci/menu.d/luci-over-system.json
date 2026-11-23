@@ -19,7 +19,7 @@
         "order": 3,
         "action": {
             "type": "view",
-            "path": "system/leds"
+            "path": "system/gateway-leds"
         }
     },
     "admin/system/ups": {
@@ -30,14 +30,26 @@
         "order": 6,
         "action": {
             "type": "view",
-            "path": "system/reboot"
+            "path": "system/gateway-reboot"
         }
     },
     "admin/system/admin": {
         "order": 7
     },
     "admin/system/ttyd": {
-        "order": 8
+        "title": "Terminal",
+        "order": 8,
+        "action": {
+            "type": "firstchild"
+        },
+        "depends": {
+            "acl": [
+                "luci-app-ttyd"
+            ],
+            "uci": {
+                "ttyd": true
+            }
+        }
     },
     "admin/system/software": {
         "depends": {
@@ -61,6 +73,29 @@
         }
     },
     "admin/system/flash": {
+        "depends": {
+            "fs": {
+                "/dev/null/hidden": "executable"
+            }
+        }
+    },
+    "admin/system/ttyd/ttyd": {
+        "title": "Terminal",
+        "order": 1,
+        "action": {
+            "type": "view",
+            "path": "ttyd/term"
+        }
+    },
+    "admin/system/ttyd/config": {
+        "title": "Config",
+        "order": 2,
+        "action": {
+            "type": "view",
+            "path": "ttyd/config"
+        }
+    },
+    "admin/services/ttyd": {
         "depends": {
             "fs": {
                 "/dev/null/hidden": "executable"

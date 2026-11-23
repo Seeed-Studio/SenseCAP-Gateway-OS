@@ -27,7 +27,7 @@
         "order": 30,
         "action": {
             "type": "view",
-            "path": "network/dhcp"
+            "path": "network/gateway-dhcp"
         },
         "depends": {
             "acl": [ "luci-mod-network-dhcp" ],
