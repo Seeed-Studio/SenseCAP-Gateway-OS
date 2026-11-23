@@ -478,6 +478,7 @@ return view.extend({
 						])));
 					}
 
+					opts.backup_pkgs[0].checked = true;
 					body.push(E('p', {}, E('label', { 'class': 'btn' }, [
 						opts.backup_pkgs[0], ' ', _('Include in backup a list of current installed packages at /etc/backup/installed_packages.txt')
 					])));
