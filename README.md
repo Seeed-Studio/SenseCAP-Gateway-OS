@@ -259,6 +259,20 @@ uci commit firewall && /etc/init.d/firewall restart
 Replace `dest_port` (and the name) as needed, and remove the rule when
 finished.
 
+The web terminal (`ttyd`) ships with `interface='@lan'`, but this image has
+no `lan` logical interface (`eth0` is WAN, `wlan0` is the LAN side), so
+`ttyd` listens on all addresses and relies on the firewall rule above to
+keep it off WAN. To bind it to the WiFi AP explicitly:
+
+```bash
+uci set ttyd.@ttyd[0].interface='wlan0'
+uci commit ttyd && /etc/init.d/ttyd restart
+```
+
+Note that `ttyd` then cannot start while the default hotspot is disabled
+(it is turned off after 5 minutes without clients), so the web terminal is
+unavailable until the AP is back.
+
 ### LXC isolation model
 
 SenseCAP runs as a **privileged, unconfined** LXC container. The host kernel
