@@ -139,6 +139,7 @@ cp ../feeds.conf.default feeds.conf.default
 
 ```bash
 ./scripts/feeds update -a
+./scripts/patch-kernel.sh feeds/packages ../patches/packages
 ./scripts/feeds install -a
 ```
 

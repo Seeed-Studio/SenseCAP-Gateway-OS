@@ -70,6 +70,11 @@ jobs:
       - name: Update feeds
         run: cd openwrt && ./scripts/feeds update -a
 
+      - name: Patch feeds
+        run: |
+          cd openwrt
+          ./scripts/patch-kernel.sh feeds/packages ../patches/packages
+
       - name: Install feeds
         run: cd openwrt && ./scripts/feeds install -a
 
