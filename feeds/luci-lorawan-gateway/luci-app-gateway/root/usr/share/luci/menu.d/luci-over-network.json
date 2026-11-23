@@ -7,8 +7,27 @@
             "path": "network/wireless"
         },
         "depends": {
-            "acl": [ "luci-mod-network-config" ],
-            "uci": { "wireless": { "@wifi-device": true } }
+            "acl": [
+                "luci-mod-network-config"
+            ],
+            "uci": {
+                "wireless": {
+                    "@wifi-device": true
+                }
+            }
+        }
+    },
+    "admin/network/network": {
+        "title": "Interfaces",
+        "order": 10,
+        "action": {
+            "type": "view",
+            "path": "network/gateway-interfaces"
+        },
+        "depends": {
+            "acl": [
+                "luci-mod-network-config"
+            ]
         }
     },
     "admin/network/routes": {
@@ -19,7 +38,9 @@
             "path": "routing/routes"
         },
         "depends": {
-            "acl": [ "luci-app-routing" ]
+            "acl": [
+                "luci-app-routing"
+            ]
         }
     },
     "admin/network/dhcp": {
@@ -30,9 +51,15 @@
             "path": "network/gateway-dhcp"
         },
         "depends": {
-            "acl": [ "luci-mod-network-dhcp" ],
-            "fs": { "/usr/sbin/dnsmasq": "executable" },
-            "uci": { "dhcp": true }
+            "acl": [
+                "luci-mod-network-dhcp"
+            ],
+            "fs": {
+                "/usr/sbin/dnsmasq": "executable"
+            },
+            "uci": {
+                "dhcp": true
+            }
         }
     },
     "admin/network/diagnostics": {
@@ -43,7 +70,9 @@
             "path": "network/diagnostics"
         },
         "depends": {
-            "acl": [ "luci-mod-network-diagnostics" ]
+            "acl": [
+                "luci-mod-network-diagnostics"
+            ]
         }
     },
     "admin/network/lte": {
@@ -62,9 +91,15 @@
             "path": "admin/network/firewall/zones"
         },
         "depends": {
-            "acl": [ "luci-app-firewall" ],
-            "fs": { "/sbin/fw3": "executable" },
-            "uci": { "firewall": true }
+            "acl": [
+                "luci-app-firewall"
+            ],
+            "fs": {
+                "/sbin/fw3": "executable"
+            },
+            "uci": {
+                "firewall": true
+            }
         }
     },
     "admin/network/multiwan": {
@@ -75,7 +110,9 @@
             "path": "multiwan/multiwan"
         },
         "depends": {
-            "acl": [ "luci-app-multiwan" ]
+            "acl": [
+                "luci-app-multiwan"
+            ]
         }
     },
     "admin/network/mwan3": {
