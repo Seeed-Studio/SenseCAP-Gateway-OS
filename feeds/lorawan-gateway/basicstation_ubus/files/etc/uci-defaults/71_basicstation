@@ -15,11 +15,16 @@ if [ ! -e "/etc/config/basicstation" ]; then
 	uci set basicstation.auth.crt=''
 	uci set basicstation.auth.trust=''
 
-	# sx130x section
+	# sx130x section: default region follows hardware EEPROM (written by 10_hardware_info)
+	HW_REGION=$(cat /etc/deviceinfo/freq_plan 2>/dev/null)
+	case "$HW_REGION" in
+		"EU868"|"CN470") REGION="$HW_REGION" ;;
+		*)               REGION="US915" ;;
+	esac
 	uci set basicstation.sx130x=sx130x
 	uci set basicstation.sx130x.comif='spi'
 	uci set basicstation.sx130x.devpath='/dev/spidev0.1'
-	uci set basicstation.sx130x.region='US915'
+	uci set basicstation.sx130x.region="$REGION"
 
 	# station section
 	uci set basicstation.station=station

@@ -233,6 +233,45 @@ Access `http://[IP_ADDRESS]/cgi-bin/luci` for:
 - **Status Overview**: LoRa status, network connections, packet statistics
 - **Services**: LoRa, network and other configurations
 
+### Remote Management (opt-in)
+
+By default the WAN firewall only accepts LoRaWAN traffic (ports 443, 1700,
+8887); management services (LuCI 80, SSH 22, ChirpStack 8080, web terminal
+7681) are reachable over the WiFi AP but not from WAN — this includes LTE
+with a public IP. To open a management service from WAN temporarily:
+
+```bash
+uci add firewall rule
+uci set firewall.@rule[-1].name='Allow-WAN-HTTP'
+uci set firewall.@rule[-1].src='wan'
+uci set firewall.@rule[-1].proto='tcp'
+uci set firewall.@rule[-1].dest_port='80'
+uci set firewall.@rule[-1].target='ACCEPT'
+uci commit firewall && /etc/init.d/firewall restart
+```
+
+Replace `dest_port` (and the name) for SSH/ChirpStack/ttyd as needed, and
+remove the rule when finished.
+
+### LXC isolation model
+
+SenseCAP runs as a **privileged, unconfined** LXC container. The host kernel
+currently has no AppArmor confinement, and `/sys` is mounted read-write.
+The container shares the host kernel; its `kmod-*` packages are therefore
+placeholders, not separately installed kernel modules.
+
+Treat SenseCAP and any additional containers as part of the same host trust
+domain, not as a security sandbox. Use a VM or a separately hardened host if
+untrusted workloads must be isolated. Changes to the host LXC configuration,
+`/usr/local/bin`, and `/boot/firmware/cmdline.txt` require rebuilding or
+reflashing the host image; they are not applied by a container OTA.
+
+To enable memory limits for additional LXC containers, edit
+`/boot/firmware/cmdline.txt` on the host, replace `cgroup_disable=memory`
+with `cgroup_enable=memory`, and reboot. Then set the container's
+`lxc.cgroup.memory.limit_in_bytes` as needed. Check availability with
+`lxc-cgroup -n SenseCAP memory.limit_in_bytes`.
+
 ## Function Modules
 
 ### LoRaWAN Gateway

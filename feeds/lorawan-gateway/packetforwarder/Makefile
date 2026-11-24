@@ -67,6 +67,7 @@ define Package/packetforwarder/install
 
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./files/etc/uci-defaults/70_packetforwarder $(1)/etc/uci-defaults/70_packetforwarder
+	$(INSTALL_BIN) ./files/etc/uci-defaults/77_region_migrate $(1)/etc/uci-defaults/77_region_migrate
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/etc/init.d/lora_pkt_fwd.init $(1)/etc/init.d/lora_pkt_fwd

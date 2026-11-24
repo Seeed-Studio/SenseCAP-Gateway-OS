@@ -73,14 +73,8 @@ uci set lora.radio.device="$DEVICE"
 uci set lora.radio.freq_plan="$FREQ"
 uci commit lora
 
-# Also update packetforwarder and basicstation
-uci set packetforwarder.sx130x.region="$REGION_MODEM"
-uci set packetforwarder.sx130x.channel_plan="$FREQ_PLAN"
-uci set packetforwarder.gateway.gateway_ID="$DEFAULT_EUI"
-uci commit packetforwarder
-
-uci set basicstation.sx130x.region="$REGION_MODEM"
-uci set basicstation.station.routerid="$DEFAULT_EUI"
-uci commit basicstation
+# packetforwarder/basicstation default region/gateway_ID come from deviceinfo
+# in their own uci-defaults (70_/71_). Cross-file sync here was unreliable
+# because at this point those sections may not exist yet (execution order).
 
 exit 0

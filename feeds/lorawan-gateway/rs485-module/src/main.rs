@@ -462,7 +462,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     logger.log(&format!("RS485-MQTT Bridge starting for port {}...", port_num));
 
     // Load initial configuration from UCI
-    let mut config = match load_config_from_uci(port_num) {
+    let config = match load_config_from_uci(port_num) {
         Ok(cfg) => cfg,
         Err(e) => {
             logger.log(&format!("Failed to setup config: {}", e));
@@ -488,19 +488,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let mut mqtt_client: Option<AsyncClient> = None;                // MQTT client
     let mut mqtt_eventloop: Option<rumqttc::EventLoop> = None;      // MQTT event loop
-    let mut mqtt_state = "not_connect";                             // MQTT connection state   
+    let mut mqtt_state = "not_connect";                             // MQTT connection state
 
     loop {
-            // Load configuration
-            config = match load_config_from_uci(port_num) {
-                Ok(cfg) => cfg,
-                Err(e) => {
-                    logger.log(&format!("Failed to load config: {}", e));
-                    return Err(e);
-                }
-            };
-
-            if config.mqtt.enabled {
+        // Configuration is loaded once at startup. Reloads are handled by
+        // procd restart via service_triggers on /etc/config/rs485-module.
+        if config.mqtt.enabled {
                 if mqtt_state == "not_connect" {
                     logger.log("MQTT enabled, start connection...");
                     match setup_mqtt_client(&config.mqtt) {
@@ -664,8 +657,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     logger.log("MQTT disabled");
                     mqtt_state = "not_connect";
                 }
+                // MQTT disabled: park until procd restarts us with a new config.
+                sleep(Duration::from_secs(3600)).await;
             }
-
-        sleep(Duration::from_millis(1)).await;
     }
 }

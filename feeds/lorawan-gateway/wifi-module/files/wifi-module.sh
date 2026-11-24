@@ -4,7 +4,17 @@ MEDIA_DIR="/media"
 CONFIG_FILE="WLAN.txt"
 WIRELESS_CONFIG="/etc/config/wireless"
 SN_FILE="/etc/deviceinfo/sn"
+FREQ_PLAN_FILE="/etc/deviceinfo/freq_plan"
 DEFAULT_SSID="R1225-0000"
+
+get_wifi_country() {
+    case "$(cat "$FREQ_PLAN_FILE" 2>/dev/null)" in
+        US915) echo "US" ;;
+        EU868) echo "FR" ;;
+        CN470) echo "CN" ;;
+        *)     echo "" ;;
+    esac
+}
 
 get_default_ssid() {
     local sn=""
@@ -121,7 +131,12 @@ apply_wifi_config() {
         uci set wireless.radio0.band='2g'
         uci set wireless.radio0.htmode='HT20'
         uci set wireless.radio0.channel='auto'
-        uci set wireless.radio0.country='CN'
+        # Keep the user's country if configured; otherwise default it from
+        # the EEPROM freq plan instead of hardcoding CN.
+        uci -q get wireless.radio0.country >/dev/null || {
+            wifi_country=$(get_wifi_country)
+            [ -n "$wifi_country" ] && uci set wireless.radio0.country="$wifi_country"
+        }
 
         uci set wireless.default_radio0='wifi-iface'
         uci set wireless.default_radio0.device='radio0'

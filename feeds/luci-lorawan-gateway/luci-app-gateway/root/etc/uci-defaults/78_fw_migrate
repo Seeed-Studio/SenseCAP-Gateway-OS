@@ -1,0 +1,27 @@
+#!/bin/sh
+# Remove the factory WAN-management allow rules (LuCI/SSH/ChirpStack/ttyd)
+# from units configured by earlier firmware; fresh installs never create
+# them anymore (see 99_luci-app-gateway). Business (Allow-lora) and
+# user-defined rules are left untouched.
+
+[ -e /etc/config/firewall ] || exit 0
+
+CHANGED=0
+i=0
+while uci -q get firewall.@rule[$i] >/dev/null 2>&1; do
+	name=$(uci -q get firewall.@rule[$i].name)
+	case "$name" in
+	Allow-WAN-HTTP|Allow-ssh-WAN|Allow-WAN-CHIRPSTACK|Allow-WAN-TTY)
+		logger -t fw_migrate "removed rule '$name' from firewall config"
+		uci -q delete firewall.@rule[$i]
+		CHANGED=1
+		;;
+	*)
+		i=$((i + 1))
+		;;
+	esac
+done
+
+[ "$CHANGED" = 1 ] && uci commit firewall
+
+exit 0

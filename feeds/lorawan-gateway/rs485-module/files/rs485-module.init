@@ -7,13 +7,18 @@ USE_PROCD=1
 PROG=/usr/bin/rs485-module
 
 start_service() {
-	local port_num protocol_enabled
+	local port_num protocol_enabled mqtt_host
 
 	for port_num in 1 2 3; do
 		protocol_enabled=$(uci -q get "rs485-module.port${port_num}.protocol_enabled")
 
 		# Skip transparent mode for ports claimed by a protocol handler (e.g. BACnet MS/TP).
 		[ "$protocol_enabled" = "1" ] && continue
+
+		# Skip ports without an MQTT broker configured; procd reload will start
+		# them once the user saves a config (service_triggers watches the file).
+		mqtt_host=$(uci -q get "rs485-module.port${port_num}.mqtt_host")
+		[ -z "$mqtt_host" ] && continue
 
 		procd_open_instance "port${port_num}"
 		procd_set_param command $PROG "$port_num"

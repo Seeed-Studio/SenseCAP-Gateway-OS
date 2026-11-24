@@ -4,14 +4,23 @@
 if [ ! -e "/etc/config/packetforwarder" ]; then
 	touch /etc/config/packetforwarder
 
+	# Default region/gateway_ID follow hardware EEPROM (written by 10_hardware_info)
+	HW_REGION=$(cat /etc/deviceinfo/freq_plan 2>/dev/null)
+	EUI=$(cat /etc/deviceinfo/eui 2>/dev/null)
+	case "$HW_REGION" in
+		"EU868") REGION="EU868"; PLAN="EU_863_870_TTN" ;;
+		"CN470") REGION="CN470"; PLAN="CN_470_510_FSB_2" ;;
+		*)       REGION="US915"; PLAN="US_902_928_FSB_2" ;;
+	esac
+
 	# sx130x section
 	uci set packetforwarder.sx130x=sx130x
-	uci set packetforwarder.sx130x.region='US915'
-	uci set packetforwarder.sx130x.channel_plan='US_902_928_FSB_2'
+	uci set packetforwarder.sx130x.region="$REGION"
+	uci set packetforwarder.sx130x.channel_plan="$PLAN"
 
 	# gateway section
 	uci set packetforwarder.gateway=gateway
-	uci set packetforwarder.gateway.gateway_ID='AA555A0000000000'
+	uci set packetforwarder.gateway.gateway_ID="${EUI:-AA555A0000000000}"
 	uci set packetforwarder.gateway.server_address='localhost'
 	uci set packetforwarder.gateway.serv_port_up='1700'
 	uci set packetforwarder.gateway.serv_port_down='1700'
