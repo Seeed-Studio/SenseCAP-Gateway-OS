@@ -8,6 +8,11 @@ on:
         required: false
         default: ''
         type: string
+      prerelease:
+        description: 'mark as pre-release instead of latest (pi-gen pulls releases/latest)'
+        required: false
+        default: false
+        type: boolean
   release:
     types: [ created ]
 
@@ -158,10 +163,11 @@ jobs:
           tag_name: ${{ github.event.inputs.tag_name }}
           name: ${{ github.event.inputs.tag_name }}
           body_path: notes.md
+          prerelease: ${{ github.event.inputs.prerelease }}
+          make_latest: ${{ github.event.inputs.prerelease != true }}
           files: |
             ./openwrt/bin/targets/armsr/armv8/openwrt-armsr-armv8-generic-rootfs.tar.gz
             ./openwrt/bin/targets/armsr/armv8/version.txt
           draft: false
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
