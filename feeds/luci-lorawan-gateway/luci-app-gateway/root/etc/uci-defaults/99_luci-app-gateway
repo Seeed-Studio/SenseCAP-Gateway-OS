@@ -3,6 +3,9 @@
 # Use a marker file to distinguish:
 # - First boot: marker not exists → apply our config
 # - OTA upgrade: marker exists → skip, keep user config
+# The marker is carried across sysupgrade via
+# /lib/upgrade/keep.d/luci-app-gateway; without it every upgrade would
+# re-run this script and duplicate its firewall rules.
 
 MARKER="/etc/.gateway_configured"
 
