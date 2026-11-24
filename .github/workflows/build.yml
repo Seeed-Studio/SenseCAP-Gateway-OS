@@ -87,10 +87,8 @@ jobs:
           # rust's host bootstrap needs the cross toolchain first and is the
           # slowest single step; build it alone so a timeout/failure is
           # attributable and the ~20 GB of intermediates can be reclaimed.
-          # Download the prebuilt LLVM instead of bootstrapping it locally:
-          # saves ~1 h on the 4-core runner and keeps the job under the 6 h limit.
-          sed -i 's/--set=llvm.download-ci-llvm=false/--set=llvm.download-ci-llvm=true/' \
-            feeds/packages/lang/rust/Makefile
+          # rust 1.94 in 24.10 is too old for ci-artifacts.rust-lang.org (the
+          # prebuilt llvm-dev download 404s), so LLVM is built locally here.
           make -j$(nproc) tools/install toolchain/install > toolchain.log 2>&1 || {
             echo "=== toolchain build failed ==="; tail -n 60 toolchain.log; exit 1
           }
