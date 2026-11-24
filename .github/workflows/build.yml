@@ -74,10 +74,33 @@ jobs:
           make defconfig
           cat .config
 
-      - name: Disable Rust LLVM CI download
+      - name: Build toolchain and rust host (separate step)
         run: |
-          sed -i 's/--set=llvm.download-ci-llvm=true/--set=llvm.download-ci-llvm=false/' \
-            openwrt/feeds/packages/lang/rust/Makefile
+          cd openwrt
+          unset CI GITHUB_ACTIONS CONTINUOUS_INTEGRATION
+          # rust's host bootstrap needs the cross toolchain first and is the
+          # slowest single step; build it alone so a timeout/failure is
+          # attributable and the ~20 GB of intermediates can be reclaimed.
+          make -j$(nproc) tools/install toolchain/install > toolchain.log 2>&1 || {
+            echo "=== toolchain build failed ==="; tail -n 60 toolchain.log; exit 1
+          }
+          make -j$(nproc) V=s package/feeds/packages/rust/host/compile > rust-host.log 2>&1 || {
+            echo "=== rust host build failed ==="
+            grep -vE "^WARNING: Makefile" rust-host.log | grep -vE "^make\[[0-9]+\]: (Entering|Leaving)" | tail -n 80
+            exit 1
+          }
+          rm -rf build_dir/target-aarch64_generic_musl/host/rustc-*/build
+          df -h /home/runner/work | tail -1
+
+      - name: Upload toolchain/rust logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: toolchain-logs
+          path: |
+            openwrt/toolchain.log
+            openwrt/rust-host.log
+          if-no-files-found: ignore
 
       - name: Build for recomputer-gateway
         run: |
