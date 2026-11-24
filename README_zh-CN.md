@@ -141,6 +141,7 @@ cp ../feeds.conf.default feeds.conf.default
 ```bash
 ./scripts/feeds update -a
 ./scripts/patch-kernel.sh feeds/packages ../patches/packages
+./scripts/patch-kernel.sh feeds/chirpstack ../patches/chirpstack
 ./scripts/feeds install -a
 ```
 
