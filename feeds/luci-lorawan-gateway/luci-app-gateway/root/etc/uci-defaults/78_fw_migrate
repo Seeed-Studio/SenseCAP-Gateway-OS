@@ -1,26 +1,67 @@
 #!/bin/sh
-# Remove the factory WAN-management allow rules (LuCI/SSH/ChirpStack/ttyd)
-# from units configured by earlier firmware; fresh installs never create
-# them anymore (see 99_luci-app-gateway). Business (Allow-lora) and
-# user-defined rules are left untouched.
+# Split cellular uplinks into a dedicated firewall zone and restore wired-WAN
+# management access (matches 99_luci-app-gateway on fresh installs).
+#   - LTE/wwan move from the wan zone to an 'lte' zone with input REJECT:
+#     management services stay reachable over wired WAN (eth0) only.
+#   - The four factory management rules are re-created on wan if missing
+#     (units upgraded through the interim FIX-2 firmware had them removed).
+# Idempotent; user-defined rules and Allow-lora are never touched.
 
 [ -e /etc/config/firewall ] || exit 0
 
 CHANGED=0
-i=0
-while uci -q get firewall.@rule[$i] >/dev/null 2>&1; do
-	name=$(uci -q get firewall.@rule[$i].name)
-	case "$name" in
-	Allow-WAN-HTTP|Allow-ssh-WAN|Allow-WAN-CHIRPSTACK|Allow-WAN-TTY)
-		logger -t fw_migrate "removed rule '$name' from firewall config"
-		uci -q delete firewall.@rule[$i]
-		CHANGED=1
-		;;
-	*)
-		i=$((i + 1))
-		;;
-	esac
+
+# lte zone: create once with factory policy
+if ! uci -q get firewall.lte.name >/dev/null; then
+	uci set firewall.lte=zone
+	uci set firewall.lte.name='lte'
+	uci set firewall.lte.input='REJECT'
+	uci set firewall.lte.output='ACCEPT'
+	uci set firewall.lte.forward='REJECT'
+	uci set firewall.lte.masq='1'
+	uci set firewall.lte.mtu_fix='1'
+	logger -t fw_migrate "created firewall zone 'lte' for cellular uplinks"
+	CHANGED=1
+fi
+
+# Membership: LTE/wwan belong to lte only
+for net in LTE wwan; do
+	uci -q del_list firewall.lte.network="$net"
+	uci add_list firewall.lte.network="$net"
 done
+for sec in $(uci -q show firewall | sed -n "s/^firewall\.\([^.=]*\)=zone$/\1/p"); do
+	[ "$sec" = "lte" ] && continue
+	for net in LTE wwan; do
+		if uci -q get firewall."$sec".network 2>/dev/null | tr ' ' '\n' | grep -qx "$net"; then
+			uci del_list firewall."$sec".network="$net"
+			CHANGED=1
+		fi
+	done
+done
+
+# Restore factory management rules on the wired-wan zone if missing
+for fr in Allow-WAN-HTTP:80 Allow-ssh-WAN:22 Allow-WAN-CHIRPSTACK:8080 Allow-WAN-TTY:7681; do
+	name="${fr%%:*}"; port="${fr##*:}"
+	if ! uci -q show firewall | grep -q "name='$name'"; then
+		uci add firewall rule
+		uci set firewall.@rule[-1].name="$name"
+		uci set firewall.@rule[-1].src='wan'
+		uci set firewall.@rule[-1].proto='tcp'
+		uci set firewall.@rule[-1].dest_port="$port"
+		uci set firewall.@rule[-1].target='ACCEPT'
+		uci set firewall.@rule[-1].family='ipv4'
+		logger -t fw_migrate "restored rule '$name' on wan zone"
+		CHANGED=1
+	fi
+done
+
+# lan -> lte forwarding for cellular uplink
+if ! uci -q show firewall | grep -q "dest='lte'"; then
+	uci add firewall forwarding
+	uci set firewall.@forwarding[-1].src='lan'
+	uci set firewall.@forwarding[-1].dest='lte'
+	CHANGED=1
+fi
 
 [ "$CHANGED" = 1 ] && uci commit firewall
 

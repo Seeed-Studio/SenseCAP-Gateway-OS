@@ -49,9 +49,19 @@ uci set network.wwan.metric='30'
 uci commit network
 
 # Set firewall rules
-# Management services (LuCI/SSH/ChirpStack/ttyd) are NOT opened from WAN by
-# default; see 78_fw_migrate which removes them from upgraded units and the
-# README for the documented opt-in.
+# Wired WAN (eth0) keeps factory management access; cellular uplinks
+# (LTE/wwan) live in a dedicated 'lte' zone with input rejected, so nothing
+# is exposed on a public-IP SIM. 78_fw_migrate applies the same split to
+# units upgraded from older firmware.
+for fr in Allow-WAN-HTTP:80 Allow-ssh-WAN:22 Allow-WAN-CHIRPSTACK:8080 Allow-WAN-TTY:7681; do
+	uci add firewall rule
+	uci set firewall.@rule[-1].name="${fr%%:*}"
+	uci set firewall.@rule[-1].src='wan'
+	uci set firewall.@rule[-1].proto='tcp'
+	uci set firewall.@rule[-1].dest_port="${fr##*:}"
+	uci set firewall.@rule[-1].target='ACCEPT'
+	uci set firewall.@rule[-1].family='ipv4'
+done
 uci add firewall rule
 uci set firewall.@rule[-1].name='Allow-lora'
 uci set firewall.@rule[-1].src='wan'
@@ -60,8 +70,20 @@ uci set firewall.@rule[-1].dest_port='443 1700 8887'
 uci set firewall.@rule[-1].target='ACCEPT'
 uci set firewall.@rule[-1].family='ipv4'
 uci add_list firewall.@zone[0].network='wlan'
-uci add_list firewall.@zone[1].network='LTE'
-uci add_list firewall.@zone[1].network='wwan'
+
+# Cellular zone: inbound rejected, NAT for uplink
+uci set firewall.lte=zone
+uci set firewall.lte.name='lte'
+uci add_list firewall.lte.network='LTE'
+uci add_list firewall.lte.network='wwan'
+uci set firewall.lte.input='REJECT'
+uci set firewall.lte.output='ACCEPT'
+uci set firewall.lte.forward='REJECT'
+uci set firewall.lte.masq='1'
+uci set firewall.lte.mtu_fix='1'
+uci add firewall forwarding
+uci set firewall.@forwarding[-1].src='lan'
+uci set firewall.@forwarding[-1].dest='lte'
 uci commit firewall
 
 # Set dhcp configuration

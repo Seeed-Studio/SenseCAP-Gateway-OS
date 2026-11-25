@@ -233,25 +233,30 @@ Access `http://[IP_ADDRESS]/cgi-bin/luci` for:
 - **Status Overview**: LoRa status, network connections, packet statistics
 - **Services**: LoRa, network and other configurations
 
-### Remote Management (opt-in)
+### Firewall Zones
 
-By default the WAN firewall only accepts LoRaWAN traffic (ports 443, 1700,
-8887); management services (LuCI 80, SSH 22, ChirpStack 8080, web terminal
-7681) are reachable over the WiFi AP but not from WAN — this includes LTE
-with a public IP. To open a management service from WAN temporarily:
+The WAN firewall is split per uplink type:
+
+- **Wired WAN (`wan`, eth0)**: accepts management services (LuCI 80, SSH 22,
+  ChirpStack 8080, web terminal 7681) and LoRaWAN traffic (443, 1700, 8887).
+- **Cellular (`lte`, LTE/wwan)**: all inbound traffic is rejected. With a SIM
+  that has a public IP, nothing is exposed on the internet.
+- **LAN (`lan`, WiFi AP)**: full management access.
+
+To open a service on the cellular zone temporarily:
 
 ```bash
 uci add firewall rule
-uci set firewall.@rule[-1].name='Allow-WAN-HTTP'
-uci set firewall.@rule[-1].src='wan'
+uci set firewall.@rule[-1].name='Allow-LTE-HTTP'
+uci set firewall.@rule[-1].src='lte'
 uci set firewall.@rule[-1].proto='tcp'
 uci set firewall.@rule[-1].dest_port='80'
 uci set firewall.@rule[-1].target='ACCEPT'
 uci commit firewall && /etc/init.d/firewall restart
 ```
 
-Replace `dest_port` (and the name) for SSH/ChirpStack/ttyd as needed, and
-remove the rule when finished.
+Replace `dest_port` (and the name) as needed, and remove the rule when
+finished.
 
 ### LXC isolation model
 
