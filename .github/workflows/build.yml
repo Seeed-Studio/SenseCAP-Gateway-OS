@@ -93,7 +93,7 @@ jobs:
           # rust's host bootstrap needs the cross toolchain first and is the
           # slowest single step; build it alone so a timeout/failure is
           # attributable and the ~20 GB of intermediates can be reclaimed.
-          # rust 1.94 in 24.10 is too old for ci-artifacts.rust-lang.org (the
+          # rust 1.96 in 25.12 is too old for ci-artifacts.rust-lang.org (the
           # prebuilt llvm-dev download 404s), so LLVM is built locally here.
           make -j$(nproc) tools/install toolchain/install > toolchain.log 2>&1 || {
             echo "=== toolchain build failed ==="; tail -n 60 toolchain.log; exit 1
@@ -119,11 +119,22 @@ jobs:
       - name: Build for recomputer-gateway
         run: |
           cd openwrt
-          unset CI
-          unset GITHUB_ACTIONS
-          unset CONTINUOUS_INTEGRATION
-          make -j$(nproc)
-      
+          unset CI GITHUB_ACTIONS CONTINUOUS_INTEGRATION
+          make -j$(nproc) V=s > build.log 2>&1 || {
+            echo "=== build failed ==="
+            grep -vE "^WARNING: Makefile" build.log | grep -vE "^make\[[0-9]+\]: (Entering|Leaving)" | grep -iE "error|failed|cannot|No such|killed|No space|panicked" | grep -vE "_error|error\.rs|ErrorKind|error_code" | tail -n 60
+            exit 1
+          }
+          echo "=== build ok ==="
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: openwrt/build.log
+          if-no-files-found: ignore
+
       - name: Upload recomputer-gateway artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -140,8 +151,8 @@ jobs:
           mkdir openwrt-armsr-armv8-generic-rootfs && cd openwrt-armsr-armv8-generic-rootfs
           tar -xzf ../openwrt-armsr-armv8-generic-rootfs.tar.gz && cp ../version.txt ./
           mkdir -p opt/packages
-          cp ../../../../packages/aarch64_generic/lorawan_gateway/*.ipk opt/packages/ || true
-          cp ../../../../packages/aarch64_generic/luci_lorawan_gateway/*.ipk opt/packages/ || true
+          cp ../../../../packages/aarch64_generic/lorawan_gateway/*.apk opt/packages/ 2>/dev/null || true
+          cp ../../../../packages/aarch64_generic/luci_lorawan_gateway/*.apk opt/packages/ 2>/dev/null || true
           sudo tar --owner=0 --group=0 --numeric-owner -czf ../openwrt-armsr-armv8-generic-rootfs.tar.gz .
           tar -tzf ../openwrt-armsr-armv8-generic-rootfs.tar.gz | grep version.txt
           
