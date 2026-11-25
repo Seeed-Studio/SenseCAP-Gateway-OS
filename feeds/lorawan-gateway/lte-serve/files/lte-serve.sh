@@ -290,12 +290,14 @@ init_lte_module() {
     # Step 4: Enable LTE dialing (set lte_disable=0)
     enable_lte_dialing
 
-    # Step 5: Ensure wwan0 exists before ifup
-    if wwan0_exists; then
+    # Step 5: netifd caches unavailable if ifup runs before the device is mapped
+    local lte_device
+    lte_device=$(uci -q get network.LTE.device)
+    if wwan0_exists && [ -c "$lte_device" ]; then
         log "Triggering LTE interface up..."
         ifup LTE 2>/dev/null &
     else
-        log "Error: wwan0 not available, cannot bring up LTE interface"
+        log "Error: $lte_device or wwan0 not available, cannot bring up LTE interface"
     fi
 
     log "LTE module initialization completed"
