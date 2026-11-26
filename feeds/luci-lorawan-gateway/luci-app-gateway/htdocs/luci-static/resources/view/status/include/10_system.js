@@ -145,8 +145,11 @@ return baseclass.extend({
 			}
 			fields.push(_('LTE RSSI'), (rssi !== '') ? rssi + 'dBm' : '-');
 		} else if (lteState !== '') {
-			var lteStateText = (lteState === 'denied') ?
-				_('Denied by carrier (check SIM subscription)') : lteState;
+			var lteStateText = lteState;
+			if (lteState === 'denied')
+				lteStateText = _('Denied by carrier (check SIM subscription)');
+			else if (lteState === 'registered')
+				lteStateText = _('Registered, no data connection');
 			fields.push(_('LTE Status'), lteStateText + (rssi !== '' ? ', ' + rssi + 'dBm' : ''));
 		}
 
