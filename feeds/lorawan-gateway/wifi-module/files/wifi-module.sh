@@ -271,22 +271,23 @@ init_r1225_hotspot() {
     
     log_message "Default hotspot ($default_ssid) is disabled, checking for other active WiFi..."
     
-    local has_active_wifi=0
-    
-    uci show wireless | grep "^wireless\." | while read -r cfg; do
+    # Pipe runs the loop in a subshell; capture the result via stdout instead
+    local has_active_wifi
+
+    has_active_wifi=$(uci show wireless | grep "^wireless\." | while read -r cfg; do
         local section=$(echo "$cfg" | cut -d'.' -f2 | cut -d'=' -f1)
         local is_iface=$(uci -q get wireless.$section 2>/dev/null | grep "wifi-iface")
-        
+
         if [ -n "$is_iface" ] && [ "$section" != "$r1225_section" ]; then
             local disabled=$(uci -q get wireless.$section.disabled 2>/dev/null)
             if [ "$disabled" != "1" ]; then
-                has_active_wifi=1
+                echo 1
                 break
             fi
         fi
-    done
-    
-    if [ "$has_active_wifi" -eq 0 ]; then
+    done)
+
+    if [ -z "$has_active_wifi" ]; then
         log_message "No other active WiFi found, enabling default hotspot ($default_ssid)..."
         uci set wireless.$r1225_section.disabled='0'
         uci commit wireless
