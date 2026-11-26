@@ -184,7 +184,8 @@ check_usb_mounts() {
 }
 
 check_new_interfaces() {
-    local current_interfaces=$(ip -o link show | awk -F': ' '{print $2}' | sort | tr '\n' ' ')
+    # wwan* comes and goes with modem re-enumeration; not a reason to restart WiFi
+    local current_interfaces=$(ip -o link show | awk -F': ' '{print $2}' | grep -v '^wwan' | sort | tr '\n' ' ')
     
     if [ -n "$LAST_INTERFACES" ] && [ "$current_interfaces" != "$LAST_INTERFACES" ]; then
         log_message "Network interface change detected, restarting WiFi..."
