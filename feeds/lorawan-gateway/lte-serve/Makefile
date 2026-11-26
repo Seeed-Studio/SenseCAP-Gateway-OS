@@ -10,7 +10,7 @@ define Package/lte-serve
   SECTION:=gateway
   CATEGORY:=Gateway
   TITLE:=LTE Module Initialization Service
-  DEPENDS:=+gpiod-tools +kmod-usb-serial +kmod-usb-serial-option
+  DEPENDS:=+gpiod-tools +kmod-usb-serial +kmod-usb-serial-option +coreutils-timeout
   PKGARCH:=all
 endef
 
@@ -24,6 +24,7 @@ endef
 define Package/lte-serve/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) ./files/lte-serve.sh $(1)/usr/bin/
+	$(INSTALL_BIN) ./files/uqmi $(1)/usr/bin/
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/lte-serve.init $(1)/etc/init.d/lte-serve

@@ -92,6 +92,7 @@ return baseclass.extend({
 		var imei        = lteInfo.imei || '';
 		var iccid       = lteInfo.iccid || '';
 		var rssi        = lteInfo.rssi || '';
+		var lteState    = lteInfo.state || '';
 
 		// Parse version.txt - only extract version number
 		var firmwareVersion = '';
@@ -135,13 +136,21 @@ return baseclass.extend({
 			_('LoRaWAN Region'),   freqPlan || '-'
 		];
 
-		// Add LTE fields only if connected
+		// LTE details when connected; otherwise surface the registration
+		// state so a carrier rejection is distinguishable from no signal
 		if (lteConnected) {
 			fields.push(_('IMEI'), imei || '-');
 			if (iccid !== '') {
 				fields.push(_('ICCID'), iccid);
 			}
 			fields.push(_('LTE RSSI'), (rssi !== '') ? rssi + 'dBm' : '-');
+		} else if (lteState !== '') {
+			var lteStateText = lteState;
+			if (lteState === 'denied')
+				lteStateText = _('Denied by carrier (check SIM subscription)');
+			else if (lteState === 'registered')
+				lteStateText = _('Registered, no data connection');
+			fields.push(_('LTE Status'), lteStateText + (rssi !== '' ? ', ' + rssi + 'dBm' : ''));
 		}
 
 		fields.push(

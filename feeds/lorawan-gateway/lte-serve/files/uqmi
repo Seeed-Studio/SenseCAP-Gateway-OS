@@ -1,0 +1,4 @@
+#!/bin/sh
+# Serialize QMI access and guarantee termination: cdc-wdm hands each reply to a
+# single reader, so concurrent uqmi processes can strand each other forever.
+exec timeout 30 flock /tmp/qmi.lock /sbin/uqmi "$@"
