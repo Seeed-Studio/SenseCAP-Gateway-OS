@@ -211,7 +211,7 @@ enable_lte_dialing() {
 
 # Get LTE info and cache it
 update_lte_info_cache() {
-    local lte_device rssi lte_status is_connected
+    local lte_device rssi siginfo state lte_status is_connected
 
     # Get LTE device from UCI config
     lte_device=$(uci -q get network.LTE.device)
@@ -270,10 +270,18 @@ update_lte_info_cache() {
         json_add_string iccid "$CACHED_ICCID"
     fi
 
-    # Get RSSI via uqmi
-    rssi=$(uqmi -s -t 500 -d "$lte_device" --get-signal-info 2>/dev/null | jsonfilter -e '@.rssi' 2>/dev/null)
+    # Get signal via uqmi (LTE reports rssi, GSM reports signal)
+    siginfo=$(uqmi -s -t 500 -d "$lte_device" --get-signal-info 2>/dev/null)
+    rssi=$(echo "$siginfo" | jsonfilter -e '@.rssi' 2>/dev/null)
+    [ -z "$rssi" ] && rssi=$(echo "$siginfo" | jsonfilter -e '@.signal' 2>/dev/null)
     if [ -n "$rssi" ]; then
         json_add_string rssi "$rssi"
+    fi
+
+    # Registration state lets the UI tell "no signal" from "rejected by carrier"
+    state=$(uqmi -s -t 500 -d "$lte_device" --get-serving-system 2>/dev/null | jsonfilter -e '@.registration' 2>/dev/null)
+    if [ -n "$state" ]; then
+        json_add_string state "$state"
     fi
 
     # Add timestamp
