@@ -13,6 +13,10 @@
 LOG_TAG="[LTE-Serve]"
 LTE_INFO_CACHE="/var/run/lte-info.json"
 LTE_INFO_UPDATE_INTERVAL=60
+LTE_DIAL_TIMEOUT=120
+LTE_RETRY_INTERVAL=60
+LTE_DOWN_SINCE=0
+LTE_HELD_UNTIL=0
 
 # if $1 is not empty, set LTE_INFO_CACHE to $1
 if [ -n "$1" ]; then
@@ -88,6 +92,19 @@ get_iccid_at() {
 # Check if wwan0 interface exists
 wwan0_exists() {
     ip link show wwan0 &>/dev/null
+}
+
+# Wait for the QMI control device to (re-)enumerate
+wait_for_qmi_device() {
+    local device="$1"
+    local max_wait=30
+    local count=0
+
+    while [ ! -c "$device" ] && [ $count -lt $max_wait ]; do
+        sleep 1
+        count=$((count + 1))
+    done
+    [ -c "$device" ]
 }
 
 # GPIO reset LTE module
@@ -194,7 +211,7 @@ enable_lte_dialing() {
 
 # Get LTE info and cache it
 update_lte_info_cache() {
-    local lte_device rssi lte_status is_connected
+    local lte_device rssi siginfo state lte_status is_connected
 
     # Get LTE device from UCI config
     lte_device=$(uci -q get network.LTE.device)
@@ -253,10 +270,18 @@ update_lte_info_cache() {
         json_add_string iccid "$CACHED_ICCID"
     fi
 
-    # Get RSSI via uqmi
-    rssi=$(uqmi -s -t 500 -d "$lte_device" --get-signal-info 2>/dev/null | jsonfilter -e '@.rssi' 2>/dev/null)
+    # Get signal via uqmi (LTE reports rssi, GSM reports signal)
+    siginfo=$(uqmi -s -t 500 -d "$lte_device" --get-signal-info 2>/dev/null)
+    rssi=$(echo "$siginfo" | jsonfilter -e '@.rssi' 2>/dev/null)
+    [ -z "$rssi" ] && rssi=$(echo "$siginfo" | jsonfilter -e '@.signal' 2>/dev/null)
     if [ -n "$rssi" ]; then
         json_add_string rssi "$rssi"
+    fi
+
+    # Registration state lets the UI tell "no signal" from "rejected by carrier"
+    state=$(uqmi -s -t 500 -d "$lte_device" --get-serving-system 2>/dev/null | jsonfilter -e '@.registration' 2>/dev/null)
+    if [ -n "$state" ]; then
+        json_add_string state "$state"
     fi
 
     # Add timestamp
@@ -293,7 +318,7 @@ init_lte_module() {
     # Step 5: netifd caches unavailable if ifup runs before the device is mapped
     local lte_device
     lte_device=$(uci -q get network.LTE.device)
-    if wwan0_exists && [ -c "$lte_device" ]; then
+    if wwan0_exists && wait_for_qmi_device "$lte_device"; then
         log "Triggering LTE interface up..."
         ifup LTE 2>/dev/null &
     else
@@ -301,6 +326,45 @@ init_lte_module() {
     fi
 
     log "LTE module initialization completed"
+}
+
+# netifd re-runs a failed qmi proto immediately, which storms the modem.
+# Cap each dial attempt, then hold and redial on our own cadence.
+lte_watchdog() {
+    local st up pending now
+    st=$(ubus -S call network.interface.LTE status 2>/dev/null) || return
+    [ -z "$st" ] && return
+    up=$(echo "$st" | jsonfilter -e '@.up' 2>/dev/null)
+    pending=$(echo "$st" | jsonfilter -e '@.pending' 2>/dev/null)
+    now=$(date +%s)
+
+    if [ "$up" = "true" ]; then
+        LTE_DOWN_SINCE=0
+        LTE_HELD_UNTIL=0
+        return
+    fi
+
+    if [ "$LTE_HELD_UNTIL" -gt 0 ]; then
+        if [ "$now" -ge "$LTE_HELD_UNTIL" ]; then
+            log "Retrying LTE dial"
+            LTE_HELD_UNTIL=0
+            LTE_DOWN_SINCE=$now
+            ifup LTE 2>/dev/null &
+        fi
+        return
+    fi
+
+    # netifd stays at pending=false only for fatal errors it refuses to
+    # retry (PIN/SIM/PLMN) - respect that and stay out
+    [ "$pending" = "true" ] || return
+
+    [ "$LTE_DOWN_SINCE" = "0" ] && LTE_DOWN_SINCE=$now
+    if [ $((now - LTE_DOWN_SINCE)) -ge "$LTE_DIAL_TIMEOUT" ]; then
+        log "LTE still down after ${LTE_DIAL_TIMEOUT}s, holding dial for ${LTE_RETRY_INTERVAL}s"
+        ifdown LTE 2>/dev/null
+        LTE_HELD_UNTIL=$((now + LTE_RETRY_INTERVAL))
+        LTE_DOWN_SINCE=0
+    fi
 }
 
 # Main loop
@@ -315,6 +379,8 @@ main() {
     # Main loop - just update info cache
     while true; do
         current_time=$(date +%s)
+
+        lte_watchdog
 
         # Update LTE info cache at intervals
         if [ $((current_time - last_lte_info_update)) -ge $LTE_INFO_UPDATE_INTERVAL ]; then

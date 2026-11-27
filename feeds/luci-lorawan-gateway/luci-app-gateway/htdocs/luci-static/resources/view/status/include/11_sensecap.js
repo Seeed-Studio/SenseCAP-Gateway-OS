@@ -73,6 +73,7 @@ return baseclass.extend({
 		var imei = lteInfo.imei || '';
 		var iccid = lteInfo.iccid || '';
 		var rssi = lteInfo.rssi || '';
+		var lteState = lteInfo.state || '';
 
 		var firmwareVersion = '';
 		if (versionText) {
@@ -104,6 +105,13 @@ return baseclass.extend({
 			if (iccid !== '')
 				fields.push(_('ICCID'), iccid);
 			fields.push(_('LTE RSSI'), (rssi !== '') ? rssi + 'dBm' : '-');
+		} else if (lteState !== '') {
+			var lteStateText = lteState;
+			if (lteState === 'denied')
+				lteStateText = _('Denied by carrier (check SIM subscription)');
+			else if (lteState === 'registered')
+				lteStateText = _('Registered, no data connection');
+			fields.push(_('LTE Status'), lteStateText + (rssi !== '' ? ', ' + rssi + 'dBm' : ''));
 		}
 
 		var table = E('table', { 'class': 'table', 'id': 'sensecap-status-table' });
