@@ -4,7 +4,7 @@
 # Handles GPIO control, AT command sending, and LTE info caching
 #
 # Flow:
-# 1. GPIO reset LTE module
+# 1. Stop LTE dialing, GPIO reset LTE module
 # 2. Wait for USB2 port, get IMEI and ICCID via AT commands
 # 3. Check wwan0, configure with AT commands if not present
 # 4. Set lte_disable=0 to allow system dialing
@@ -105,6 +105,23 @@ wait_for_qmi_device() {
         count=$((count + 1))
     done
     [ -c "$device" ]
+}
+
+# Stop dialing before the reset: netifd would redial the instant the modem
+# re-enumerates, miss wwan0 (the host moves it in up to 10s later) and park
+# the interface as unavailable for good.
+stop_lte_dialing() {
+    local max_wait=10
+    local count=0
+
+    ifdown LTE 2>/dev/null
+    while [ "$(ubus -S call network.interface.LTE status 2>/dev/null | jsonfilter -e '@.pending' 2>/dev/null)" = "true" ] && [ $count -lt $max_wait ]; do
+        sleep 1
+        count=$((count + 1))
+    done
+    # pending drops as soon as the setup handler dies; the teardown script
+    # starts right after it
+    sleep 2
 }
 
 # GPIO reset LTE module
@@ -300,7 +317,8 @@ init_lte_module() {
     LTE_RST_LINE=$(uci get hardware.hardware.lte_rst_line)
     LTE_USB_PORT=$(uci get hardware.hardware.lte_usb_port)
 
-    # Step 1: GPIO reset LTE module
+    # Step 1: Stop dialing, then GPIO reset LTE module
+    stop_lte_dialing
     reset_lte_module
 
     # Step 2: Wait for USB port and get IMEI/ICCID
