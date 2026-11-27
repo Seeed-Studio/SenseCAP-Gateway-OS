@@ -77,9 +77,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Verify CRC
-    // CRC of previous bytes (0x04 to 0x42, length 64)
+    // CRC of bytes 0x06 to 0x44 (length 62), data_len excluded, as the production tool writes it
     uint32_t stored_crc = ntohl(data.crc);
-    uint32_t calced_crc = calc_crc32((uint8_t*)&data + 4, 64);
+    uint32_t calced_crc = calc_crc32((uint8_t*)&data + 6, 62);
     
     if (stored_crc != calced_crc) {
          fprintf(stderr, "Warning: CRC Mismatch. Stored: 0x%08X, Calc: 0x%08X\n", stored_crc, calced_crc);

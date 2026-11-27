@@ -127,7 +127,8 @@ calc_crc32() {
 }
 
 CRC_DATA_TMP=$(mktemp)
-tail -c +5 "$DATA_TMP" > "$CRC_DATA_TMP"
+# same range as the production writer: bytes 6..67 (magic and data_len excluded)
+tail -c +7 "$DATA_TMP" > "$CRC_DATA_TMP"
 CRC_HEX=$(calc_crc32 "$CRC_DATA_TMP")
 rm "$CRC_DATA_TMP"
 # Convert CRC hex to binary (4 bytes)
